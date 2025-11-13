@@ -255,7 +255,7 @@ server <- function(input, output, session) {
         )
       ),
       dashboardBody(
-        h3(paste("Bienvenido,", user$name, " (Rol:", user$role, ")"), icon("hand-peace")),
+        h6(paste("Bienvenido,", user$name, " (Rol:", user$role, ")"), icon("hand-peace")),
         
         tabItems(
           # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
@@ -263,11 +263,11 @@ server <- function(input, output, session) {
                   h2("Reporte Administrativo: Parámetros de Producción"),
                   
                   fluidRow(
-                    valueBoxOutput("kpi_peso_promedio"),
-                    valueBoxOutput("kpi_calib_promedio"),
-                    valueBoxOutput("kpi_tasa_rechazo"),
+                    valueBoxOutput("kpi_peso_promedio",width = 6),
+                    valueBoxOutput("kpi_calib_promedio",width = 6),
+                   # valueBoxOutput("kpi_tasa_rechazo",width = 6),
                     
-                    box(title = "Filtro de Datos", status = "warning", width = 3,
+                    box(title = "Filtro de Datos", status = "warning", width = 6,
                         uiOutput("ui_filtro_semana") # ESTO HACE LLAMADO A LA LÓGICA REACTIVA ARRIBA
                     )
                     
@@ -373,7 +373,7 @@ server <- function(input, output, session) {
     req(nrow(data) > 0)
     # ¡CORREGIDO! Usando PESO_BRUTO
     promedio <- mean(data$PESO_BRUTO, na.rm = TRUE) 
-    valueBox(value = paste(round(promedio, 1), "Kg"), subtitle = "Peso Promedio Global", icon = icon("balance-scale"), color = "navy") 
+    valueBox(value = paste(round(promedio, 1), "Lb"), subtitle = "Peso Promedio Global", icon = icon("balance-scale"), color = "navy") 
   })
   
   # KPI 2: Calibración Promedio
@@ -382,7 +382,7 @@ server <- function(input, output, session) {
     req(nrow(data) > 0)
     # ¡CORREGIDO! Usando CALIBRACION_SUP
     promedio <- mean(data$CALIBRACION_SUP, na.rm = TRUE) 
-    valueBox(value = paste(round(promedio, 1), "mm"), subtitle = "Calibracion Promedio", icon = icon("expand"), color = "green")
+    valueBox(value = paste(round(promedio, 1), ""), subtitle = "Calibracion Promedio", icon = icon("expand"), color = "green")
   })
   
   # KPI 3: Tasa de Rechazo (ASUMIENDO QUE TASA_RECHAZO EXISTE O ESTÁ CALCULADA EN OTRO LUGAR)
