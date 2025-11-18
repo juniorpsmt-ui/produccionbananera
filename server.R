@@ -24,6 +24,9 @@ tryCatch({
 })
 
 
+View( datos_banano_raw)
+
+
 server <- function(input, output, session) {
   
   user_email_js <- reactiveVal(NULL)
@@ -92,9 +95,12 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$logout_btn, {
+    # 1. Ejecutar el sign out de Firebase
     session$sendCustomMessage(type = 'sign_out', message = list())
+    
+    # 2. Ejecutar código JS para limpiar los campos de entrada
+    shinyjs::runjs("$('#login_email').val(''); $('#login_password').val('');")
   })
-  
   # --- 4. OBTENER INFORMACIÓN DEL USUARIO Y MAPEO DE ROLES ---
   user_info <- reactive({
     current_user_email <- user_email_js() 
@@ -140,15 +146,14 @@ server <- function(input, output, session) {
     }
   })
   
-  # --- 5B. Lógica de Mapeo y Preparación de Columnas (Estabilización) ---
+  
+  
+  
+  # --- 5B. Lógica de Mapeo y Preparación de Columnas (Estabilización) --- los llama los kpi que estan abajo
   datos_dashboard <- reactive({
     data <- datos_filtrados_crudos()
     req(nrow(data) > 0)
-    
-    
-    
-    
-    # *** CORRECCIÓN DE COLUMNAS Y PREPARACIÓN MÍNIMA ***
+        # *** CORRECCIÓN DE COLUMNAS Y PREPARACIÓN MÍNIMA ***
     data %>%
       # 1. Renombramos las columnas con nombres problemáticos a nombres internos sin espacios
       rename(
@@ -179,47 +184,83 @@ server <- function(input, output, session) {
       )
   })
   
-  # --- 8. LÓGICA DEL REPORTE ADMINISTRATIVO (Agrupación por Lote y Promedios Múltiples) ---
-  reporte_promedios <- reactive({
+  
+  
+  
+  # --- 8A. FUNCIÓN DE DATOS FILTRADOS POR USUARIO (KPIs y Tabla) ---
+  datos_para_kpi_y_tabla <- reactive({
     data <- datos_dashboard() 
     req(nrow(data) > 0)
     
+    # *** APLICAR FILTROS EN CASCADA ***
     
-    # *** 1. APLICAR FILTRO POR SEMANA ***
-    if (!is.null(input$filtro_semana) && input$filtro_semana != "Todos") {
-      data <- data %>%
-        filter(SEMANA_COSECHA == input$filtro_semana)
+    # Filtro por EMPRESA (Solo si el filtro existe y no es "Todas")
+    if (!is.null(input$filtro_empresa) && input$filtro_empresa != "Todas") {
+      data <- data %>% filter(EMPRESA_ID_FILTRO == input$filtro_empresa)
     }
     
-    req(nrow(data) > 0) # Si el filtro no devuelve nada, salimos
+    # Filtro por AÑO
+    if (!is.null(input$filtro_ano) && input$filtro_ano != "Todos") {
+      data <- data %>% filter(Ano == as.numeric(input$filtro_ano))
+    }
+    
+    # Filtro por HACIENDA
+    if (!is.null(input$filtro_hacienda) && input$filtro_hacienda != "Todas") {
+      data <- data %>% filter(HACIENDA == input$filtro_hacienda)
+    }
+    
+    # Filtro por SEMANA
+    if (!is.null(input$filtro_semana) && input$filtro_semana != "Todos") {
+      data <- data %>% filter(SEMANA_COSECHA == input$filtro_semana)
+    }
+    
+    return(data)
+  })
   
+  
+  # --- 8B. LÓGICA DEL REPORTE ADMINISTRATIVO (Agrupación y Resumen) ---
+  reporte_promedios <- reactive({
+    # AHORA TOMA LOS DATOS YA FILTRADOS
+    data <- datos_para_kpi_y_tabla() 
+    req(nrow(data) > 0)
     
-    
-    
-      # AGRUPACIÓN: EMPRESA, HACIENDA y LOTE
+    # AGRUPACIÓN: EMPRESA, HACIENDA y LOTE (sin la lógica de filtrado)
     data %>%
       group_by(
-        EMPRESA_ID_FILTRO, # EMPRESA
+        EMPRESA_ID_FILTRO, 
         HACIENDA, 
-        LOTE_ID # LOTE
+        LOTE_ID 
       ) %>%
       summarise(
-        # 1. Promedio del Peso Bruto
         Peso_Bruto_Promedio = mean(PESO_BRUTO, na.rm = TRUE), 
-        
-        # 2. Promedio de Calibración Superior (Usando el nombre mapeado)
         Calibracion_Promedio = mean(CALIBRACION_SUP, na.rm = TRUE),
-        
-        # 3. Promedio de Número de Manos (Usando el nombre original de la columna con espacio, ya que no fue mapeada)
         Num_Manos_Promedio = mean(`Numero de manos`, na.rm = TRUE),
+        # *** NUEVO CÁLCULO: Promedio de Edad ***
+        Edad_Promedio = mean(Edad, na.rm = TRUE),
         
-        # Conteo de Racimos
         Total_Racimos = n(),
         .groups = 'drop'
       ) %>%
-      # Ordenar por Hacienda y Lote
-      arrange(HACIENDA, LOTE_ID)
+      arrange(as.numeric(LOTE_ID)) %>%
+    
+    # *** NUEVO PASO: OCULTAR EMPRESA y HACIENDA ***
+   
+      select(
+        LOTE_ID, 
+        Peso_Bruto_Promedio, 
+        Calibracion_Promedio, 
+        Num_Manos_Promedio, 
+        # *** SELECCIÓN DE LA NUEVA COLUMNA ***
+        Edad_Promedio,
+        Total_Racimos
+      )
+    
+    
+    
   })
+  
+  
+  
   
   
   
@@ -259,19 +300,40 @@ server <- function(input, output, session) {
         
         tabItems(
           # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
+          # 1. Pestaña de Reporte Administrativo
           tabItem(tabName = "tab_reporte_admin",
                   h2("Reporte Administrativo: Parámetros de Producción"),
                   
+                  # **********************************************
+                  # *** NUEVA SECCIÓN: FILTROS DE EXPLORACIÓN ***
+                  # **********************************************
                   fluidRow(
-                    valueBoxOutput("kpi_peso_promedio",width = 6),
-                    valueBoxOutput("kpi_calib_promedio",width = 6),
-                   # valueBoxOutput("kpi_tasa_rechazo",width = 6),
-                    
-                    box(title = "Filtro de Datos", status = "warning", width = 6,
-                        uiOutput("ui_filtro_semana") # ESTO HACE LLAMADO A LA LÓGICA REACTIVA ARRIBA
+                    box(title = "Filtros de Exploración", status = "warning", solidHeader = TRUE, width = 12,
+                        column(width = 12, 
+                               column(width = 3,uiOutput("ui_filtro_empresa")), # Solo visible para Super Admin
+                                      column(width = 3,uiOutput("ui_filtro_ano")),
+                                             column(width = 3,uiOutput("ui_filtro_hacienda")),
+                                                    column(width = 3,uiOutput("ui_filtro_semana"))
+                        )
                     )
-                    
                   ),
+                  # **********************************************
+                  
+                  fluidRow(
+                    # KPI's con ancho 6 para poner Peso y Calibración lado a lado
+                    valueBoxOutput("kpi_peso_promedio", width = 6),
+                    valueBoxOutput("kpi_calib_promedio", width = 6)
+                    
+                  ), # Finaliza la primera fila de 2 KPIs
+                  
+                  fluidRow(
+                    # SEGUNDA FILA: Tasa de Rechazo y Edad Promedio (6 + 6 = 12)
+                    valueBoxOutput("kpi_tasa_rechazo", width = 6), 
+                    valueBoxOutput("kpi_edad_promedio", width = 6)
+                  ),
+                  
+                  
+                  
                   # Contenedor para el reporte tabular
                   fluidRow(
                     box(title = "Promedios de Producción por Parámetro", status = "primary", solidHeader = TRUE, width = 12,
@@ -316,6 +378,11 @@ server <- function(input, output, session) {
     )
   })
   
+  
+  
+  
+  
+  
   # --- 9. RENDERIZACIÓN DE LA TABLA DEL REPORTE ADMINISTRATIVO ---
   output$table_promedios <- DT::renderDataTable({
     data <- reporte_promedios()
@@ -328,7 +395,9 @@ server <- function(input, output, session) {
     ) %>%
       formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>% # 2 decimales para Peso
       formatRound(columns = 'Calibracion_Promedio', digits = 1) %>% # 1 decimal para Calibración (mm)
-      formatRound(columns = 'Num_Manos_Promedio', digits = 1)       # 1 decimal para Manos
+      formatRound(columns = 'Num_Manos_Promedio', digits = 1)    %>%    # 1 decimal para Manos
+    # *** NUEVO FORMATO: Edad Promedio ***
+    formatRound(columns = 'Edad_Promedio', digits = 1)
   })
   
   
@@ -362,6 +431,71 @@ server <- function(input, output, session) {
   
   
   
+  # --- LÓGICA PARA GENERAR EL FILTRO DE HACIENDAS ---
+  output$ui_filtro_hacienda <- renderUI({
+    data <- datos_dashboard()
+    req(nrow(data) > 0)
+    
+    opciones <- sort(unique(data$HACIENDA))
+    opciones <- c("Todas", opciones)
+    
+    selectInput(
+      "filtro_hacienda", 
+      "Filtrar por Hacienda:", 
+      choices = opciones,
+      selected = "SAN HUMBERTO"
+    )
+  })
+  
+  # --- LÓGICA PARA GENERAR EL FILTRO DE AÑOS ---
+  output$ui_filtro_ano <- renderUI({
+    data <- datos_dashboard()
+    req(nrow(data) > 0)
+    
+    # Aseguramos que 'Ano' sea una lista de caracteres para el filtro
+    opciones <- sort(as.character(unique(data$Ano)), decreasing = TRUE)
+    opciones <- c("Todos", opciones)
+    
+    selectInput(
+      "filtro_ano", 
+      "Filtrar por Año:", 
+      choices = opciones,
+      selected = "Todos"
+    )
+  })
+  
+  # --- LÓGICA PARA GENERAR EL FILTRO DE EMPRESAS (Solo si el usuario es SUPER_ADMIN) ---
+  output$ui_filtro_empresa <- renderUI({
+    user <- user_info()
+    
+    # Este filtro solo se debe mostrar si el usuario tiene acceso a múltiples empresas
+    if (user$role != "SUPER_ADMIN") {
+      return(NULL) # Si no es Super Admin, no mostramos este filtro.
+    }
+    
+    data <- datos_dashboard()
+    req(nrow(data) > 0)
+    
+    opciones <- sort(unique(data$EMPRESA_ID_FILTRO))
+    opciones <- c("Todas", opciones)
+    
+    selectInput(
+      "filtro_empresa", 
+      "Filtrar por Empresa:", 
+      choices = opciones,
+      selected = "Todas"
+    )
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   
   
@@ -369,29 +503,52 @@ server <- function(input, output, session) {
   
   # KPI 1: Peso Promedio
   output$kpi_peso_promedio <- renderValueBox({
-    data <- datos_dashboard()
+    # *** CAMBIO AQUÍ: Usamos la función con filtros ***
+    data <- datos_para_kpi_y_tabla() 
     req(nrow(data) > 0)
-    # ¡CORREGIDO! Usando PESO_BRUTO
     promedio <- mean(data$PESO_BRUTO, na.rm = TRUE) 
     valueBox(value = paste(round(promedio, 1), "Lb"), subtitle = "Peso Promedio Global", icon = icon("balance-scale"), color = "navy") 
   })
   
+  
   # KPI 2: Calibración Promedio
   output$kpi_calib_promedio <- renderValueBox({
-    data <- datos_dashboard()
+    # *** CAMBIO AQUÍ: Usamos la función con filtros ***
+    data <- datos_para_kpi_y_tabla() 
     req(nrow(data) > 0)
-    # ¡CORREGIDO! Usando CALIBRACION_SUP
     promedio <- mean(data$CALIBRACION_SUP, na.rm = TRUE) 
-    valueBox(value = paste(round(promedio, 1), ""), subtitle = "Calibracion Promedio", icon = icon("expand"), color = "green")
+    valueBox(value = paste(round(promedio, 1), ""), subtitle = "Calibración Promedio", icon = icon("expand"), color = "green")
   })
   
-  # KPI 3: Tasa de Rechazo (ASUMIENDO QUE TASA_RECHAZO EXISTE O ESTÁ CALCULADA EN OTRO LUGAR)
-  # output$kpi_tasa_rechazo <- renderValueBox({
-  # data <- datos_dashboard()
-  # req(nrow(data) > 0)
+  # # KPI 3: Tasa de Rechazo
+  #output$kpi_tasa_rechazo <- renderValueBox({
+    # *** CAMBIO AQUÍ: Usamos la función con filtros ***
+  #  data <- datos_para_kpi_y_tabla() 
+   # req(nrow(data) > 0)
+    # Asumiendo que TASA_RECHAZO existe y es una proporción (Ej. 0.05 = 5%)
+    # Si la columna TASA_RECHAZO contiene valores absolutos de tasa (Ej. 5, 10, 2), usamos `mean`
   #  tasa <- mean(data$TASA_RECHAZO, na.rm = TRUE)
-  #  valueBox(value = paste(round(tasa, 1), "%"), subtitle = "Tasa de Rechazo Promedio", icon = icon("fire"), color = "red") 
+   # valueBox(value = paste(round(tasa, 1), "%"), subtitle = "Tasa de Rechazo Promedio", icon = icon("fire"), color = "red") 
   #})
+  
+  # --- KPI 4: Edad Promedio ---
+  output$kpi_edad_promedio <- renderValueBox({
+    # Usa la función con filtros para que el KPI reaccione a la selección del usuario
+    data <- datos_para_kpi_y_tabla() 
+    req(nrow(data) > 0)
+        # Calculamos la edad promedio
+    promedio <- mean(data$Edad, na.rm = TRUE) 
+        valueBox(
+      value = paste(round(promedio, 1), ""), 
+      subtitle = "Edad Promedio de Cosecha", 
+      icon = icon("leaf"), 
+      color = "maroon" # Un color distintivo
+    ) 
+  })
+  
+  
+  
+  
   
   # Gráfico: Peso Promedio por Lote
   output$plot_peso_lote <- renderPlot({
