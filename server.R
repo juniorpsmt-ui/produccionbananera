@@ -384,21 +384,82 @@ server <- function(input, output, session) {
   
   
   # --- 9. RENDERIZACIÓN DE LA TABLA DEL REPORTE ADMINISTRATIVO ---
-  output$table_promedios <- DT::renderDataTable({
-    data <- reporte_promedios()
-    req(nrow(data) > 0)
+output$table_promedios <- DT::renderDataTable({
+  data <- reporte_promedios()
+  req(nrow(data) > 0)
+  
+  DT::datatable(
+    data, 
+    options = list(pageLength = 10, scrollX = TRUE), 
+    rownames = FALSE
+  ) %>%
+    # --- 1. FORMATOS DE REDONDEO ---
+    formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>% 
+    formatRound(columns = 'Calibracion_Promedio', digits = 1) %>% 
+    formatRound(columns = 'Num_Manos_Promedio', digits = 1) %>%
+    formatRound(columns = 'Edad_Promedio', digits =1) %>%
     
-    DT::datatable(
-      data, 
-      options = list(pageLength = 10, scrollX = TRUE), 
-      rownames = FALSE
+    
+    # --- 2. SEMAFORIZACIÓN De los paramtetros de produccion
+    
+    # --- 2. SEMAFORIZACIÓN DEL PESO BRUTO (Peso_Bruto_Promedio) ---
+    formatStyle(
+      'Peso_Bruto_Promedio',
+      backgroundColor = styleInterval(
+        c(45, 60), # Puntos de corte: <40 es 1, 40-50 es 2, >50 es 3
+        c('red', 'yellow', 'lightgreen') # Colores: Rojo (bajo), Amarillo (advertencia), Verde (óptimo)
+      )
     ) %>%
-      formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>% # 2 decimales para Peso
-      formatRound(columns = 'Calibracion_Promedio', digits = 1) %>% # 1 decimal para Calibración (mm)
-      formatRound(columns = 'Num_Manos_Promedio', digits = 1)    %>%    # 1 decimal para Manos
-    # *** NUEVO FORMATO: Edad Promedio ***
-    formatRound(columns = 'Edad_Promedio', digits = 1)
-  })
+    
+    # --- 3. SEMAFORIZACIÓN DE CALIBRACIÓN (Calibracion_Promedio) ---
+    # Rango óptimo (Verde): 43.0 a 44.0
+    # Rango de Advertencia (Amarillo): 42.0 a <43.0 Y >44.0 a 45.0
+    # Rango Crítico (Rojo): <42.0 O >45.0
+    
+    formatStyle(
+      'Calibracion_Promedio',
+      # Definimos los 5 rangos con 4 puntos de corte: 42, 43, 44, 45
+      backgroundColor = styleInterval(
+        c(42, 43.5, 45, 45.5), 
+        c('red',      # < 42.0 (Crítico)
+          'yellow',   # 42.0 a <43.0 (Advertencia)
+          'lightgreen', # 43.5 a <45 (Óptimo)
+          'yellow',   # 44.0 a <45.0 (Advertencia)
+          'red')      # > 45.0 (Crítico)
+      )
+    ) %>%
+    
+ 
+    
+    # --- 4. SEMAFORIZACIÓN DE NÚMERO DE MANOS (Num_Manos_Promedio) ---
+    
+ 
+    formatStyle(
+      'Num_Manos_Promedio',
+      backgroundColor = styleInterval(
+        c(7, 8), # Puntos de corte: <7, 7-8, >8
+        c('red', 'yellow', 'lightgreen')
+      )
+    ) %>%
+    
+    # --- 5. SEMAFORIZACIÓN DE EDAD (Lógica simplificada y corregida) ---
+    # Rango óptimo 11-13 semanas. Todo lo que esté fuera es amarillo o rojo.
+    # Lógica: <10 (Rojo), 10-14 (Amarillo/Verde), >14 (Rojo)
+    formatStyle(
+      'Edad_Promedio',
+      # 1. Rojo para los extremos: <10 o >14
+      backgroundColor = styleInterval(
+        c(10, 14), 
+        c('red', 'yellow', 'red')
+      )
+    ) %>%
+    formatStyle(
+      'Edad_Promedio',
+      # 2. Sobrescribir con Verde solo el rango óptimo (11, 12, 13)
+      backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
+    )
+  
+})
   
   
   
