@@ -27,6 +27,39 @@ tryCatch({
 View( datos_banano_raw)
 
 
+
+# --- FUNCIÓN JAVASCRIPT PARA PERSONALIZAR EL PDF (BORDES Y ENCABEZADO) en la tabla cuando se desvarga en pdf---
+js_customize_pdf <- DT::JS("
+  function(doc) {
+    // 1. Ajusta el ancho de las columnas para ocupar todo el espacio
+    doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1).join('*').split('');
+    
+    // 2. Bucle para todas las filas (cuerpo y encabezado)
+    for (i = 0; i < doc.content[1].table.body.length; i++) {
+      var row = doc.content[1].table.body[i];
+      
+      row.forEach(function(cell) {
+        // *** CORRECCIÓN CRÍTICA PARA LÍNEAS VERTICALES Y HORIZONTALES ***
+        cell.hLineWidth = 1; // Grosor de la línea horizontal
+        cell.vLineWidth = 1; // Grosor de la línea vertical
+        cell.borderColor = ['#000000', '#000000', '#000000', '#000000']; // Color negro explícito para todos los bordes
+        cell.border = [true, true, true, true]; // Forzar visibilidad del borde (Arriba, Izquierda, Abajo, Derecha)
+        
+        if (i === 0) {
+          // Estilo para el encabezado (primera fila: i=0)
+          cell.fillColor = '#f2f2f2'; 
+          cell.bold = true; 
+          cell.color = '#000000'; // Color de texto negro (soluciona el problema de invisibilidad)
+        }
+      });
+    }
+  }
+")
+
+
+
+
+
 server <- function(input, output, session) {
   
   user_email_js <- reactiveVal(NULL)
@@ -149,7 +182,8 @@ server <- function(input, output, session) {
   
   
   
-  # --- 5B. Lógica de Mapeo y Preparación de Columnas (Estabilización) --- los llama los kpi que estan abajo
+  # --- 5B. Lógica de Mapeo y Preparación de Columnas (Estabilización) --- los llama los kpi que estan abajo aqui se preparan los datos 
+  
   datos_dashboard <- reactive({
     data <- datos_filtrados_crudos()
     req(nrow(data) > 0)
@@ -161,7 +195,9 @@ server <- function(input, output, session) {
         PESO_BRUTO = `Peso bruto`, # ¡CORREGIDO!
         CALIBRACION_SUP = `Calibracion superior`, # ¡CORREGIDO!
         SEMANA_COSECHA = `Semana de cosecha`, # ¡CORREGIDO!
-        EMPRESA_ID_FILTRO = EMPRESA
+        EMPRESA_ID_FILTRO = EMPRESA,
+        Has = has
+        
         # Asumiendo que las columnas RECUSADOS y TASA_RECHAZO existen o se definen en el Excel/raw
         # Si no existen, los KPIs de Rechazo seguirán fallando.
       ) %>%
@@ -170,14 +206,23 @@ server <- function(input, output, session) {
         Ano = as.numeric(Ano),
         LOTE_ID = as.character(LOTE_ID),
         # AHORA CONVERTIMOS SEMANA_COSECHA A CHARACTER/FACTOR para el filtro
-        SEMANA_COSECHA = as.character(SEMANA_COSECHA)
+        SEMANA_COSECHA = as.character(SEMANA_COSECHA),
+        # *** NUEVO: Aseguramos que 'Has' sea numérico para usarlo en cálculos ***
+        Has = as.numeric(Has),
+        # Aseguramos que 'Rechazado' sea un factor o carácter limpio (ej. mayúsculas)
+        Rechazado = as.character(Rechazado)
+        
       ) %>%
         
       
       # 3. Seleccionamos solo las columnas críticas para la agrupación y cálculo
       select(
         EMPRESA_ID_FILTRO, HACIENDA, Ano, LOTE_ID, SEMANA_COSECHA, Edad, Cinta, 
-        PESO_BRUTO, CALIBRACION_SUP, # Columnas estandarizadas
+        PESO_BRUTO, CALIBRACION_SUP, # *** INCLUIMOS 'Has' EN EL DATASET DE TRABAJO ***
+        Has, # Columnas estandarizadas
+        
+        
+        
         # Mantener otras columnas necesarias para los KPIs/Tablas existentes
         `Peso raquis`, Rechazado, Recuperado, `Numero de manos`, palanca, Defecto, `Generador de merma`, EdDi, `Tipo de plantacion`, TPId, MC
         # Mantener TASA_RECHAZO y RECUSADOS (si existen en el data.frame)
@@ -238,21 +283,42 @@ server <- function(input, output, session) {
         # *** NUEVO CÁLCULO: Promedio de Edad ***
         Edad_Promedio = mean(Edad, na.rm = TRUE),
         
+        # *** CÁLCULO SOLICITADO: Conteo de Racimos Rechazados (R.recusados) ***
+        # Cuenta el número de filas donde la columna 'Rechazado' es igual a 'Si' (o 'S').
+        # Nota: Asumo que el valor de rechazo es 'Si' basado en el contexto. Si es 'S', 
+        # debes cambiar 'Si' por 'S'.
+        R_recusados = sum(toupper(Rechazado) != 'NO', na.rm = TRUE),
+    
+        
+        
         Total_Racimos = n(),
+        
+        # *** CORRECCIÓN: Hectáreas por Lote (Valor fijo) ***
+        Hectareas = first(Has), # Usamos first() para obtener el valor único/fijo
+        
+        
+        # *** NUEVO CÁLCULO: Racimos Procesados ***
+        `R_procesados` = Total_Racimos - `R_recusados`,
+        
         .groups = 'drop'
       ) %>%
       arrange(as.numeric(LOTE_ID)) %>%
     
     # *** NUEVO PASO: OCULTAR EMPRESA y HACIENDA ***
-   
+      # SELECCIÓN Y ORDEN DE COLUMNAS PARA LA TABLA
       select(
         LOTE_ID, 
+        Hectareas,
         Peso_Bruto_Promedio, 
         Calibracion_Promedio, 
         Num_Manos_Promedio, 
         # *** SELECCIÓN DE LA NUEVA COLUMNA ***
         Edad_Promedio,
-        Total_Racimos
+        Total_Racimos,
+        
+        # *** INCLUIMOS EL CONTEO CON EL NOMBRE SOLICITADO ***
+        R_recusados,
+        R_procesados
       )
     
     
@@ -284,7 +350,7 @@ server <- function(input, output, session) {
         sidebarMenu(
           id = "tabs", 
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
-          menuItem("📊 Reporte Administrativo", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
+          menuItem("📊 Reporte Administrativo por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
           
           menuItem("❌ Tasa de Rechazo", tabName = "tab_rechazo", icon = icon("times")),
           menuItem("🔬 Optimización por Edad", tabName = "tab_edad", icon = icon("leaf")),
@@ -302,7 +368,7 @@ server <- function(input, output, session) {
           # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
           # 1. Pestaña de Reporte Administrativo
           tabItem(tabName = "tab_reporte_admin",
-                  h2("Reporte Administrativo: Parámetros de Producción"),
+                  h2("Reporte Administrativo: Parámetros de Producción por Lotes"),
                   
                   # **********************************************
                   # *** NUEVA SECCIÓN: FILTROS DE EXPLORACIÓN ***
@@ -321,22 +387,26 @@ server <- function(input, output, session) {
                   
                   fluidRow(
                     # KPI's con ancho 6 para poner Peso y Calibración lado a lado
-                    valueBoxOutput("kpi_peso_promedio", width = 6),
-                    valueBoxOutput("kpi_calib_promedio", width = 6)
+                    valueBoxOutput("kpi_peso_promedio", width = 3),
+                    valueBoxOutput("kpi_calib_promedio", width = 3),
+                    valueBoxOutput("kpi_edad_promedio", width = 3)
                     
                   ), # Finaliza la primera fila de 2 KPIs
                   
-                  fluidRow(
-                    # SEGUNDA FILA: Tasa de Rechazo y Edad Promedio (6 + 6 = 12)
-                    valueBoxOutput("kpi_tasa_rechazo", width = 6), 
-                    valueBoxOutput("kpi_edad_promedio", width = 6)
-                  ),
+                 
+                  
+                  
+             #      fluidRow(
+              #      # SEGUNDA FILA: Tasa de Rechazo y Edad Promedio (6 + 6 = 12)
+               #     valueBoxOutput("kpi_tasa_rechazo", width = 6), 
+                #    valueBoxOutput("kpi_edad_promedio", width = 6)
+                 # ),
                   
                   
                   
                   # Contenedor para el reporte tabular
                   fluidRow(
-                    box(title = "Promedios de Producción por Parámetro", status = "primary", solidHeader = TRUE, width = 12,
+                    box(title = "Promedios de Producción por Lotes", status = "primary", solidHeader = TRUE, width = 12,
                         DT::dataTableOutput("table_promedios"))
                   )
           ),
@@ -390,7 +460,40 @@ output$table_promedios <- DT::renderDataTable({
   
   DT::datatable(
     data, 
-    options = list(pageLength = 10, scrollX = TRUE), 
+    
+    # *** CAMBIO APLICADO: Añadir la clase 'cell-border' ***
+    class = 'cell-border stripe',
+    
+    # *** CAMBIO 1: Habilitar la extensión de Botones ***
+    extensions = 'Buttons',
+    
+    options = list(pageLength = 10, scrollX = TRUE, 
+    
+                   # *** CAMBIO 2: Definir la estructura (dom) e incluir los botones (B) ***
+                   dom = 'Bfrtip', # 'B' incluye los botones, 'f' el filtro, 'r' loading, 't' tabla, 'i' info, 'p' paginación
+                   buttons = list(
+                     'copy', # Opción de copiar (Copy)
+                     list(extend = 'csv', filename = 'Reporte_Administrativo'),
+                     list(extend = 'excel', filename = 'Reporte_Administrativo', title = 'Reporte Administrativo por Lotes'),
+                     
+                     list(
+                       extend = 'pdf', 
+                       title = 'Reporte Administrativo por Lotes',
+                       # 1. Orientación horizontal
+                       orientation = 'landscape', 
+                       # 2. Configuración de página (Ajuste de tamaño)
+                       pageSize = 'A4', 
+                       # 3. Exporta solo las columnas que están actualmente visibles
+                       exportOptions = list(columns = 1:9),
+                       
+                       # 1. Función de personalización para añadir bordes
+                      
+                       customize = js_customize_pdf # <<< USAMOS LA VARIABLE DEFINIDA ARRIBA
+                     )
+           
+         )
+    ),
+    
     rownames = FALSE
   ) %>%
     # --- 1. FORMATOS DE REDONDEO ---
@@ -398,6 +501,13 @@ output$table_promedios <- DT::renderDataTable({
     formatRound(columns = 'Calibracion_Promedio', digits = 1) %>% 
     formatRound(columns = 'Num_Manos_Promedio', digits = 1) %>%
     formatRound(columns = 'Edad_Promedio', digits =1) %>%
+    formatRound(columns = 'Hectareas', digits = 2) %>% # Formato para Hectáreas
+    
+    # *** NUEVO FORMATO: R.recusados (Conteo) ***
+    formatRound(columns =  'R_recusados' , digits = 0) %>%
+    
+    # *** NUEVO FORMATO: R_procesados (Conteo entero) ***
+    formatRound(columns = 'R_procesados', digits = 0) %>%
     
     
     # --- 2. SEMAFORIZACIÓN De los paramtetros de produccion
