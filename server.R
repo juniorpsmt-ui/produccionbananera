@@ -24,7 +24,7 @@ tryCatch({
 })
 
 
-View( datos_banano_raw)
+# View( datos_banano_raw)
 
 
 
