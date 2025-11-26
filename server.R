@@ -27,39 +27,6 @@ tryCatch({
 # View( datos_banano_raw)
 
 
-
-# --- FUNCIÓN JAVASCRIPT PARA PERSONALIZAR EL PDF (BORDES Y ENCABEZADO) en la tabla cuando se desvarga en pdf---
-js_customize_pdf <- DT::JS("
-  function(doc) {
-    // 1. Ajusta el ancho de las columnas para ocupar todo el espacio
-    doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1).join('*').split('');
-    
-    // 2. Bucle para todas las filas (cuerpo y encabezado)
-    for (i = 0; i < doc.content[1].table.body.length; i++) {
-      var row = doc.content[1].table.body[i];
-      
-      row.forEach(function(cell) {
-        // *** CORRECCIÓN CRÍTICA PARA LÍNEAS VERTICALES Y HORIZONTALES ***
-        cell.hLineWidth = 1; // Grosor de la línea horizontal
-        cell.vLineWidth = 1; // Grosor de la línea vertical
-        cell.borderColor = ['#000000', '#000000', '#000000', '#000000']; // Color negro explícito para todos los bordes
-        cell.border = [true, true, true, true]; // Forzar visibilidad del borde (Arriba, Izquierda, Abajo, Derecha)
-        
-        if (i === 0) {
-          // Estilo para el encabezado (primera fila: i=0)
-          cell.fillColor = '#f2f2f2'; 
-          cell.bold = true; 
-          cell.color = '#000000'; // Color de texto negro (soluciona el problema de invisibilidad)
-        }
-      });
-    }
-  }
-")
-
-
-
-
-
 server <- function(input, output, session) {
   
   user_email_js <- reactiveVal(NULL)
@@ -330,6 +297,62 @@ server <- function(input, output, session) {
   
   
   
+  # --- 8C. LÓGICA DEL REPORTE ADMINISTRATIVO (Agrupación por SEMANA) --- para el dashboard de semana 
+  reporte_promedios_semana <- reactive({
+    # AHORA TOMA LOS DATOS YA FILTRADOS
+    data <- datos_para_kpi_y_tabla()
+    req(nrow(data) > 0)
+    
+    # AGRUPACIÓN: EMPRESA, HACIENDA y SEMANA DE COSECHA
+    data %>%
+      group_by(
+        EMPRESA_ID_FILTRO,
+        HACIENDA,
+        SEMANA_COSECHA # <<< CAMBIO CLAVE: Agrupación por Semana
+      ) %>%
+      summarise(
+        Peso_Bruto_Promedio = mean(PESO_BRUTO, na.rm = TRUE),
+        Calibracion_Promedio = mean(CALIBRACION_SUP, na.rm = TRUE),
+        Num_Manos_Promedio = mean(`Numero de manos`, na.rm = TRUE),
+        Edad_Promedio = mean(Edad, na.rm = TRUE),
+        
+        R_recusados = sum(toupper(Rechazado) != 'NO', na.rm = TRUE),
+        Total_Racimos = n(),
+        
+        # *** ELIMINAMOS LA COLUMNA Hectareas de la sumatoria ***
+        
+        `R_procesados` = Total_Racimos - `R_recusados`,
+        TASA_RECHAZO = (R_recusados / Total_Racimos) * 100,
+        
+        .groups = 'drop'
+      ) %>%
+      # Ordenamos por SEMANA_COSECHA
+      arrange(SEMANA_COSECHA) %>%
+      
+      # SELECCIÓN Y ORDEN DE COLUMNAS PARA LA TABLA
+      select(
+        SEMANA_COSECHA, # <<< CAMBIO CLAVE: Columna de Semana
+        # Hectareas, # Opcional: la quitamos por ser irrelevante en este resumen
+        Peso_Bruto_Promedio,
+        Calibracion_Promedio,
+        Num_Manos_Promedio,
+        Edad_Promedio,
+        Total_Racimos,
+        R_recusados,
+        R_procesados,
+        TASA_RECHAZO
+      )
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   # --- 6. RENDERIZACIÓN DEL DASHBOARD Y MENÚ CONDICIONAL ---
   output$sidebar_menu <- renderUI({
@@ -339,19 +362,20 @@ server <- function(input, output, session) {
                                   style = "color: white; background-color: #d9534f; border-color: #d9534f;")
     
     dashboardPage(
-      skin = "green", 
+      skin = "green",
       dashboardHeader(
         title = HTML("🍌 **SISBANLAM** | BI Bananero"),
         titleWidth = 300,
         tags$li(class = "dropdown", logout_button) 
       ),
       dashboardSidebar(
-        width = 300, 
+        width = 300,
         sidebarMenu(
-          id = "tabs", 
+          id = "tabs",
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
           menuItem("📊 Reporte Administrativo por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
-          
+          # *** NUEVA PESTAÑA 2: REPORTE POR SEMANA ***
+          menuItem("📅 Reporte Administrativo por Semana", tabName = "tab_reporte_admin_semana", icon = icon("calendar-alt")),
           menuItem("❌ Tasa de Rechazo", tabName = "tab_rechazo", icon = icon("times")),
           menuItem("🔬 Optimización por Edad", tabName = "tab_edad", icon = icon("leaf")),
           
@@ -364,54 +388,66 @@ server <- function(input, output, session) {
       dashboardBody(
         h6(paste("Bienvenido,", user$name, " (Rol:", user$role, ")"), icon("hand-peace")),
         
+        # ******************************************************
+        # *** SOLUCIÓN: FILTROS GLOBALES (Fuera de tabItems) ***
+        # ******************************************************
+        fluidRow(
+          box(title = "Filtros de Exploración", status = "warning", solidHeader = TRUE, width = 12,
+              column(width = 12,
+                     column(width = 3, uiOutput("ui_filtro_empresa")),
+                     column(width = 3, uiOutput("ui_filtro_ano")),
+                     column(width = 3, uiOutput("ui_filtro_hacienda")),
+                     column(width = 3, uiOutput("ui_filtro_semana"))
+              )
+          )
+        ),
+        
         tabItems(
-          # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
+
+          
+                    # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
           # 1. Pestaña de Reporte Administrativo
           tabItem(tabName = "tab_reporte_admin",
                   h2("Reporte Administrativo: Parámetros de Producción por Lotes"),
                   
-                  # **********************************************
-                  # *** NUEVA SECCIÓN: FILTROS DE EXPLORACIÓN ***
-                  # **********************************************
-                  fluidRow(
-                    box(title = "Filtros de Exploración", status = "warning", solidHeader = TRUE, width = 12,
-                        column(width = 12, 
-                               column(width = 3,uiOutput("ui_filtro_empresa")), # Solo visible para Super Admin
-                                      column(width = 3,uiOutput("ui_filtro_ano")),
-                                             column(width = 3,uiOutput("ui_filtro_hacienda")),
-                                                    column(width = 3,uiOutput("ui_filtro_semana"))
-                        )
-                    )
-                  ),
-                  # **********************************************
-                  
+                  # *** KPIS (Reutilizan los filtros globales)
                   fluidRow(
                     # KPI's con ancho 6 para poner Peso y Calibración lado a lado
                     valueBoxOutput("kpi_peso_promedio", width = 3),
                     valueBoxOutput("kpi_calib_promedio", width = 3),
                     valueBoxOutput("kpi_edad_promedio", width = 3)
-                    
-                  ), # Finaliza la primera fila de 2 KPIs
-                  
-                 
-                  
-                  
-             #      fluidRow(
-              #      # SEGUNDA FILA: Tasa de Rechazo y Edad Promedio (6 + 6 = 12)
-               #     valueBoxOutput("kpi_tasa_rechazo", width = 6), 
-                #    valueBoxOutput("kpi_edad_promedio", width = 6)
-                 # ),
-                  
-                  
-                  
-                  # Contenedor para el reporte tabular
+                    ),
+                  # TABLA DE DATOS POR LOTES
                   fluidRow(
                     box(title = "Promedios de Producción por Lotes", status = "primary", solidHeader = TRUE, width = 12,
                         DT::dataTableOutput("table_promedios"))
-                  )
+                    )             
           ),
           
-          # 2. Pestaña de Tasa de Rechazo (El tabItem original)
+          
+          
+          # *** 2. NUEVA Pestaña de Reporte Administrativo POR SEMANA ***
+          tabItem(tabName = "tab_reporte_admin_semana",
+                  h2("Reporte Administrativo: Parámetros de Producción por Semana"),
+                  
+                
+                  # KPIS para SEMANA (NUEVOS IDs para evitar el conflicto)
+                  fluidRow(
+                    valueBoxOutput("kpi_peso_promedio_semana", width = 3),
+                    valueBoxOutput("kpi_calib_promedio_semana", width = 3),
+                    valueBoxOutput("kpi_edad_promedio_semana", width = 3)
+                  ),      
+                  
+                  # *** TABLA DE DATOS POR SEMANA ***
+                  fluidRow(
+                    box(title = "Promedios de Producción por Semana", status = "primary", solidHeader = TRUE, width = 12,
+                        DT::dataTableOutput("table_promedios_semana")) # <<< NUEVA SALIDA DE TABLA
+                  )
+                  
+          ),
+          
+          
+                     # 2. Pestaña de Tasa de Rechazo (El tabItem original)
           tabItem(tabName = "tab_rechazo",
                   h2("Análisis de Pérdidas y Recusados"),
                   fluidRow(
@@ -445,7 +481,7 @@ server <- function(input, output, session) {
           )
         )
       )
-    )
+      )
   })
   
   
@@ -468,9 +504,10 @@ output$table_promedios <- DT::renderDataTable({
     extensions = 'Buttons',
     
     options = list(pageLength = 10, scrollX = TRUE, 
+                   lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
     
                    # *** CAMBIO 2: Definir la estructura (dom) e incluir los botones (B) ***
-                   dom = 'Bfrtip', # 'B' incluye los botones, 'f' el filtro, 'r' loading, 't' tabla, 'i' info, 'p' paginación
+                   dom = 'lBfrtip', # 'B' incluye los botones, 'f' el filtro, 'r' loading, 't' tabla, 'i' info, 'p' paginación
                    buttons = list(
                      'copy', # Opción de copiar (Copy)
                      list(extend = 'csv', filename = 'Reporte_Administrativo'),
@@ -482,13 +519,7 @@ output$table_promedios <- DT::renderDataTable({
                        # 1. Orientación horizontal
                        orientation = 'landscape', 
                        # 2. Configuración de página (Ajuste de tamaño)
-                       pageSize = 'A4', 
-                       # 3. Exporta solo las columnas que están actualmente visibles
-                       exportOptions = list(columns = 1:9),
-                       
-                       # 1. Función de personalización para añadir bordes
-                      
-                       customize = js_customize_pdf # <<< USAMOS LA VARIABLE DEFINIDA ARRIBA
+                       pageSize = 'A4'
                      )
            
          )
@@ -497,8 +528,8 @@ output$table_promedios <- DT::renderDataTable({
     rownames = FALSE
   ) %>%
     # --- 1. FORMATOS DE REDONDEO ---
-    formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>% 
-    formatRound(columns = 'Calibracion_Promedio', digits = 1) %>% 
+    formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>%
+    formatRound(columns = 'Calibracion_Promedio', digits = 1) %>%
     formatRound(columns = 'Num_Manos_Promedio', digits = 1) %>%
     formatRound(columns = 'Edad_Promedio', digits =1) %>%
     formatRound(columns = 'Hectareas', digits = 2) %>% # Formato para Hectáreas
@@ -530,11 +561,11 @@ output$table_promedios <- DT::renderDataTable({
       'Calibracion_Promedio',
       # Definimos los 5 rangos con 4 puntos de corte: 42, 43, 44, 45
       backgroundColor = styleInterval(
-        c(42, 43.5, 45, 45.5), 
-        c('red',      # < 42.0 (Crítico)
-          'yellow',   # 42.0 a <43.0 (Advertencia)
-          'lightgreen', # 43.5 a <45 (Óptimo)
-          'yellow',   # 44.0 a <45.0 (Advertencia)
+        c(42, 43.5, 45, 45.5),
+        c('red',    # < 42.0 (Crítico)
+          'yellow',  # 42.0 a <43.0 (Advertencia)
+          'lightgreen',# 43.5 a <45 (Óptimo)
+          'yellow',  # 44.0 a <45.0 (Advertencia)
           'red')      # > 45.0 (Crítico)
       )
     ) %>%
@@ -571,7 +602,86 @@ output$table_promedios <- DT::renderDataTable({
   
 })
   
+
+
+
   
+
+# --- 10. RENDERIZACIÓN DE LA TABLA DEL REPORTE ADMINISTRATIVO POR SEMANA ---
+output$table_promedios_semana <- DT::renderDataTable({
+  # *** CAMBIO CLAVE: Usamos la nueva función de resumen por semana ***
+  data <- reporte_promedios_semana()
+  req(nrow(data) > 0)
+  
+  DT::datatable(
+    data,
+    class = 'cell-border stripe',
+    extensions = 'Buttons',
+    
+    options = list(
+      pageLength = 10,
+      scrollX = TRUE,
+      lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
+      dom = 'lBfrtip',
+      buttons = list(
+        'copy', 
+        list(extend = 'csv', filename = 'Reporte_Administrativo_Semana'),
+        list(extend = 'excel', filename = 'Reporte_Administrativo_Semana', title = 'Reporte Administrativo por Semana'),
+        list(extend = 'pdf', title = 'Reporte Administrativo por Semana')
+      )
+    ),
+    
+    rownames = FALSE
+  ) %>%
+    # --- FORMATOS DE REDONDEO ---
+    formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>%
+    formatRound(columns = 'Calibracion_Promedio', digits = 1) %>%
+    formatRound(columns = 'Num_Manos_Promedio', digits = 1) %>%
+    formatRound(columns = 'Edad_Promedio', digits = 1) %>%
+    formatRound(columns = 'TASA_RECHAZO', digits = 2) %>%
+    formatRound(columns = 'R_recusados' , digits = 0) %>%
+    formatRound(columns = 'R_procesados', digits = 0) %>%
+    
+    # *** SEMAFORIZACIÓN (Se aplica la misma lógica de Lotes) ***
+    formatStyle(
+      'Peso_Bruto_Promedio',
+      backgroundColor = styleInterval(
+        c(45, 60),
+        c('red', 'yellow', 'lightgreen') 
+      )
+    ) %>%
+    formatStyle(
+      'Calibracion_Promedio',
+      backgroundColor = styleInterval(
+        c(42, 43.5, 45, 45.5),
+        c('red', 'yellow', 'lightgreen', 'yellow', 'red')
+      )
+    ) %>%
+    formatStyle(
+      'Num_Manos_Promedio',
+      backgroundColor = styleInterval(
+        c(7, 8),
+        c('red', 'yellow', 'lightgreen')
+      )
+    ) %>%
+    formatStyle(
+      'Edad_Promedio',
+      backgroundColor = styleInterval(
+        c(10, 14),
+        c('red', 'yellow', 'red')
+      )
+    ) %>%
+    formatStyle(
+      'Edad_Promedio',
+      backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
+    )
+})
+
+
+
+
+
+
   
   
   # --- LÓGICA PARA GENERAR EL FILTRO DE SEMANAS (Añadir a Server.R) ---
@@ -717,9 +827,50 @@ output$table_promedios <- DT::renderDataTable({
     ) 
   })
   
+  ##########################################################################################################
+  
+  # --- 7.3. KPIS para el Reporte Administrativo POR SEMANA ---
+  
+  output$kpi_peso_promedio_semana <- renderValueBox({
+    df_filtrado <- datos_para_kpi_y_tabla() # Reutiliza los datos ya filtrados
+    peso_promedio <- mean(df_filtrado$PESO_BRUTO, na.rm = TRUE)
+    valueBox(
+      value =  paste(round(peso_promedio, 2), "Lb"), "Peso Promedio (Semana)", 
+      icon = icon("weight-hanging"), color = "green"
+    )
+  })
+  
+  output$kpi_calib_promedio_semana <- renderValueBox({
+    df_filtrado <- datos_para_kpi_y_tabla()
+    calibre_promedio <- mean(df_filtrado$CALIBRACION_SUP, na.rm = TRUE)
+    valueBox(
+      value =  paste(round(calibre_promedio, 2), ""), "Calibre Promedio (Semana)", 
+      icon = icon("ruler-horizontal"), color = "yellow"
+    )
+  })
+  
+  output$kpi_edad_promedio_semana <- renderValueBox({
+    df_filtrado <- datos_para_kpi_y_tabla()
+    edad_promedio <- mean(df_filtrado$Edad, na.rm = TRUE)
+    valueBox(
+      value =  paste(round(edad_promedio, 2), ""), "Edad Promedio (Semana)", 
+      icon = icon("calendar-day"), color = "blue"
+    )
+  })
   
   
   
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  #################################################
   
   # Gráfico: Peso Promedio por Lote
   output$plot_peso_lote <- renderPlot({

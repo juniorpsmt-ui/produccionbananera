@@ -29,7 +29,7 @@ ui <- fluidPage(
       p("Accede a tu cuenta de SISBANLAM"),
       
       # Campos de Login
-      textInput("login_email", "Email", placeholder = "ej: testsisbanlam@gmail.com"),
+      textInput("login_email", "Email", placeholder = "ej: sisbanlam@gmail.com"),
       passwordInput("login_password", "Contraseña", placeholder = "********"),
       actionButton("login_submit", "Ingresar / Registrar", class = "btn-success", 
                    style = "width: 100%; margin-top: 15px;"),
