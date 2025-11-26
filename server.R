@@ -274,20 +274,19 @@ server <- function(input, output, session) {
     # *** NUEVO PASO: OCULTAR EMPRESA y HACIENDA ***
       # SELECCIÓN Y ORDEN DE COLUMNAS PARA LA TABLA
       select(
-        LOTE_ID, 
-        Hectareas,
-        Peso_Bruto_Promedio, 
-        Calibracion_Promedio, 
-        Num_Manos_Promedio, 
-        # *** SELECCIÓN DE LA NUEVA COLUMNA ***
-        Edad_Promedio,
-        Total_Racimos,
-        
-        # *** INCLUIMOS EL CONTEO CON EL NOMBRE SOLICITADO ***
-        R_recusados,
-        R_procesados
+        LOTE_ID = LOTE_ID,
+        Hectareas = Hectareas,
+        # Usamos saltos de línea en lugar de truncar
+        `Peso Bruto<br>Promedio` = Peso_Bruto_Promedio,
+        `Calibracion<br>Promedio` = Calibracion_Promedio,
+        `Núm. Manos<br>Promedio` = Num_Manos_Promedio,
+        `Edad<br>Promedio` = Edad_Promedio,
+        `Racimos<br>Totales` = Total_Racimos,
+        # Y así sucesivamente para las demás columnas...
+        `Racimos<br>Recusados` = R_recusados,
+        `Racimos<br>Procesados` = R_procesados
+        # En reporte_promedios_semana: `Tasa<br>Rechazo` = TASA_RECHAZO
       )
-    
     
     
   })
@@ -333,23 +332,25 @@ server <- function(input, output, session) {
       select(
         SEMANA_COSECHA, # <<< CAMBIO CLAVE: Columna de Semana
         # Hectareas, # Opcional: la quitamos por ser irrelevante en este resumen
-        Peso_Bruto_Promedio,
-        Calibracion_Promedio,
-        Num_Manos_Promedio,
-        Edad_Promedio,
-        Total_Racimos,
-        R_recusados,
-        R_procesados,
-        TASA_RECHAZO
+        
+  
+        
+        # Usamos saltos de línea en lugar de truncar
+        `Peso Bruto<br>Promedio` = Peso_Bruto_Promedio,
+        `Calibracion<br>Promedio` = Calibracion_Promedio,
+        `Núm. Manos<br>Promedio` = Num_Manos_Promedio,
+        `Edad<br>Promedio` = Edad_Promedio,
+        `Racimos<br>Totales` = Total_Racimos,
+        # Y así sucesivamente para las demás columnas...
+        `Racimos<br>Recusados` = R_recusados,
+        `Racimos<br>Procesados` = R_procesados
+        
+        
+        
+        
+       
       )
   })
-  
-  
-  
-  
-  
-  
-  
   
   
   
@@ -373,7 +374,7 @@ server <- function(input, output, session) {
         sidebarMenu(
           id = "tabs",
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
-          menuItem("📊 Reporte Administrativo por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
+          menuItem("📊 Reporte Administrativo General por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
           # *** NUEVA PESTAÑA 2: REPORTE POR SEMANA ***
           menuItem("📅 Reporte Administrativo por Semana", tabName = "tab_reporte_admin_semana", icon = icon("calendar-alt")),
           menuItem("❌ Tasa de Rechazo", tabName = "tab_rechazo", icon = icon("times")),
@@ -386,13 +387,69 @@ server <- function(input, output, session) {
         )
       ),
       dashboardBody(
+        
+        ###############################################################################
+        
+        # *** ESTILOS CSS PARA COMPACTAR LA UI ***
+        tags$head(
+          tags$style(HTML("
+             /* Compacta la altura de los boxes (Filtros y KPIs) */
+             .compact-box-kpi .box-body,
+             .compact-box-kpi .box-header {
+                 padding-top: 2px !important;
+                 padding-bottom: 5px !important;
+                 margin-bottom: 0px !important;
+             }
+             .compact-box-kpi .form-group {
+                 margin-bottom: 3px !important; /* Reduce el espacio debajo de los filtros */
+             }
+
+             /* Compacta los valueBoxes (KPIs) */
+             .small-box {
+                 min-height: 50px; /* Altura mínima reducida */
+                 margin-bottom: 5px; /* Espacio inferior reducido */
+             }
+             .small-box h3 {
+                 font-size: 18px; /* Tamaño de valor reducido */
+                 margin: 0 0 5px 0;
+             }
+             .small-box p {
+                 font-size: 11px; /* Tamaño de subtítulo reducido */
+             }
+             
+             /* Compacta la tabla DataTable */
+             .dataTables_wrapper .dataTables_paginate .paginate_button {
+                 padding: 0.1em 0.5em; /* Reduce el padding de los botones de paginación */
+             }
+             
+             /* Estilo para los encabezados de tabla multilinea y reducción de padding de celdas */
+                .dataTables_wrapper table.dataTable td, 
+                .dataTables_wrapper table.dataTable th {
+                    padding: 3px 5px !important; 
+                    white-space: nowrap; /* Evita que los datos de las filas se envuelvan */
+                }
+             
+             
+         "))
+        ),
+        
+        # ******************************************************
+        # *** FIN DE LA INYECCIÓN DE CSS ***
+        # ********************
+        
+        
         h6(paste("Bienvenido,", user$name, " (Rol:", user$role, ")"), icon("hand-peace")),
+
+        
+        
+       
         
         # ******************************************************
         # *** SOLUCIÓN: FILTROS GLOBALES (Fuera de tabItems) ***
         # ******************************************************
         fluidRow(
           box(title = "Filtros de Exploración", status = "warning", solidHeader = TRUE, width = 12,
+              class = "compact-box-kpi",
               column(width = 12,
                      column(width = 3, uiOutput("ui_filtro_empresa")),
                      column(width = 3, uiOutput("ui_filtro_ano")),
@@ -411,12 +468,15 @@ server <- function(input, output, session) {
                   h2("Reporte Administrativo: Parámetros de Producción por Lotes"),
                   
                   # *** KPIS (Reutilizan los filtros globales)
-                  fluidRow(
-                    # KPI's con ancho 6 para poner Peso y Calibración lado a lado
-                    valueBoxOutput("kpi_peso_promedio", width = 3),
-                    valueBoxOutput("kpi_calib_promedio", width = 3),
-                    valueBoxOutput("kpi_edad_promedio", width = 3)
-                    ),
+                  # KPIS para LOTES (Mantienen los IDs originales)
+                  # EN LUGAR DE fluidRow(), usaremos un box
+                  box(title = "KPIs de Lote", status = "info", solidHeader = TRUE, width = 12, 
+                      class = "compact-box-kpi", # Nueva clase para reducir altura
+                      
+                      valueBoxOutput("kpi_peso_promedio", width = 3),
+                      valueBoxOutput("kpi_calib_promedio", width = 3),
+                      valueBoxOutput("kpi_edad_promedio", width = 3)
+                  ),
                   # TABLA DE DATOS POR LOTES
                   fluidRow(
                     box(title = "Promedios de Producción por Lotes", status = "primary", solidHeader = TRUE, width = 12,
@@ -431,12 +491,22 @@ server <- function(input, output, session) {
                   h2("Reporte Administrativo: Parámetros de Producción por Semana"),
                   
                 
-                  # KPIS para SEMANA (NUEVOS IDs para evitar el conflicto)
-                  fluidRow(
-                    valueBoxOutput("kpi_peso_promedio_semana", width = 3),
-                    valueBoxOutput("kpi_calib_promedio_semana", width = 3),
-                    valueBoxOutput("kpi_edad_promedio_semana", width = 3)
-                  ),      
+                 
+                  
+                  # *** KPIS (Reutilizan los filtros globales)
+                  # KPIS para LOTES (Mantienen los IDs originales)
+                  # EN LUGAR DE fluidRow(), usaremos un box
+                  box(title = "KPIs de Semana", status = "info", solidHeader = TRUE, width = 12, 
+                      class = "compact-box-kpi", # Nueva clase para reducir altura
+                      
+                      valueBoxOutput("kpi_peso_promedio_semana", width = 3),
+                      valueBoxOutput("kpi_calib_promedio_semana", width = 3),
+                      valueBoxOutput("kpi_edad_promedio_semana", width = 3)
+                  ),
+                  
+                  
+                  
+                  
                   
                   # *** TABLA DE DATOS POR SEMANA ***
                   fluidRow(
@@ -496,7 +566,7 @@ output$table_promedios <- DT::renderDataTable({
   
   DT::datatable(
     data, 
-    
+    escape = FALSE,
     # *** CAMBIO APLICADO: Añadir la clase 'cell-border' ***
     class = 'cell-border stripe',
     
@@ -528,24 +598,24 @@ output$table_promedios <- DT::renderDataTable({
     rownames = FALSE
   ) %>%
     # --- 1. FORMATOS DE REDONDEO ---
-    formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>%
-    formatRound(columns = 'Calibracion_Promedio', digits = 1) %>%
-    formatRound(columns = 'Num_Manos_Promedio', digits = 1) %>%
-    formatRound(columns = 'Edad_Promedio', digits =1) %>%
+    formatRound(columns = 'Peso Bruto<br>Promedio', digits = 2) %>%
+    formatRound(columns = 'Calibracion<br>Promedio', digits = 1) %>%
+    formatRound(columns = 'Núm. Manos<br>Promedio', digits = 1) %>%
+    formatRound(columns = 'Edad<br>Promedio', digits =1) %>%
     formatRound(columns = 'Hectareas', digits = 2) %>% # Formato para Hectáreas
     
     # *** NUEVO FORMATO: R.recusados (Conteo) ***
-    formatRound(columns =  'R_recusados' , digits = 0) %>%
+    formatRound(columns =  'Racimos<br>Recusados' , digits = 0) %>%
     
     # *** NUEVO FORMATO: R_procesados (Conteo entero) ***
-    formatRound(columns = 'R_procesados', digits = 0) %>%
+    formatRound(columns ='Racimos<br>Procesados', digits = 0) %>%
     
     
     # --- 2. SEMAFORIZACIÓN De los paramtetros de produccion
     
     # --- 2. SEMAFORIZACIÓN DEL PESO BRUTO (Peso_Bruto_Promedio) ---
     formatStyle(
-      'Peso_Bruto_Promedio',
+      'Peso Bruto<br>Promedio',
       backgroundColor = styleInterval(
         c(45, 60), # Puntos de corte: <40 es 1, 40-50 es 2, >50 es 3
         c('red', 'yellow', 'lightgreen') # Colores: Rojo (bajo), Amarillo (advertencia), Verde (óptimo)
@@ -558,7 +628,7 @@ output$table_promedios <- DT::renderDataTable({
     # Rango Crítico (Rojo): <42.0 O >45.0
     
     formatStyle(
-      'Calibracion_Promedio',
+      'Calibracion<br>Promedio',
       # Definimos los 5 rangos con 4 puntos de corte: 42, 43, 44, 45
       backgroundColor = styleInterval(
         c(42, 43.5, 45, 45.5),
@@ -576,7 +646,7 @@ output$table_promedios <- DT::renderDataTable({
     
  
     formatStyle(
-      'Num_Manos_Promedio',
+      'Núm. Manos<br>Promedio',
       backgroundColor = styleInterval(
         c(7, 8), # Puntos de corte: <7, 7-8, >8
         c('red', 'yellow', 'lightgreen')
@@ -587,7 +657,7 @@ output$table_promedios <- DT::renderDataTable({
     # Rango óptimo 11-13 semanas. Todo lo que esté fuera es amarillo o rojo.
     # Lógica: <10 (Rojo), 10-14 (Amarillo/Verde), >14 (Rojo)
     formatStyle(
-      'Edad_Promedio',
+      'Edad<br>Promedio',
       # 1. Rojo para los extremos: <10 o >14
       backgroundColor = styleInterval(
         c(10, 14), 
@@ -595,7 +665,7 @@ output$table_promedios <- DT::renderDataTable({
       )
     ) %>%
     formatStyle(
-      'Edad_Promedio',
+      'Edad<br>Promedio',
       # 2. Sobrescribir con Verde solo el rango óptimo (11, 12, 13)
       backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
     )
@@ -615,6 +685,7 @@ output$table_promedios_semana <- DT::renderDataTable({
   
   DT::datatable(
     data,
+    escape = FALSE,
     class = 'cell-border stripe',
     extensions = 'Buttons',
     
@@ -634,45 +705,45 @@ output$table_promedios_semana <- DT::renderDataTable({
     rownames = FALSE
   ) %>%
     # --- FORMATOS DE REDONDEO ---
-    formatRound(columns = 'Peso_Bruto_Promedio', digits = 2) %>%
-    formatRound(columns = 'Calibracion_Promedio', digits = 1) %>%
-    formatRound(columns = 'Num_Manos_Promedio', digits = 1) %>%
-    formatRound(columns = 'Edad_Promedio', digits = 1) %>%
-    formatRound(columns = 'TASA_RECHAZO', digits = 2) %>%
-    formatRound(columns = 'R_recusados' , digits = 0) %>%
-    formatRound(columns = 'R_procesados', digits = 0) %>%
+    formatRound(columns = 'Peso Bruto<br>Promedio', digits = 2) %>%
+    formatRound(columns = 'Calibracion<br>Promedio', digits = 1) %>%
+    formatRound(columns = 'Núm. Manos<br>Promedio', digits = 1) %>%
+    formatRound(columns = 'Edad<br>Promedio', digits = 1) %>%
+  #  formatRound(columns = 'TASA_RECHAZO', digits = 2) %>%
+    formatRound(columns = 'Racimos<br>Recusados' , digits = 0) %>%
+    formatRound(columns ='Racimos<br>Procesados', digits = 0) %>%
     
     # *** SEMAFORIZACIÓN (Se aplica la misma lógica de Lotes) ***
     formatStyle(
-      'Peso_Bruto_Promedio',
+      'Peso Bruto<br>Promedio',
       backgroundColor = styleInterval(
         c(45, 60),
         c('red', 'yellow', 'lightgreen') 
       )
     ) %>%
     formatStyle(
-      'Calibracion_Promedio',
+      'Calibracion<br>Promedio',
       backgroundColor = styleInterval(
         c(42, 43.5, 45, 45.5),
         c('red', 'yellow', 'lightgreen', 'yellow', 'red')
       )
     ) %>%
     formatStyle(
-      'Num_Manos_Promedio',
+      'Núm. Manos<br>Promedio',
       backgroundColor = styleInterval(
         c(7, 8),
         c('red', 'yellow', 'lightgreen')
       )
     ) %>%
     formatStyle(
-      'Edad_Promedio',
+      'Edad<br>Promedio',
       backgroundColor = styleInterval(
         c(10, 14),
         c('red', 'yellow', 'red')
       )
     ) %>%
     formatStyle(
-      'Edad_Promedio',
+      'Edad<br>Promedio',
       backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
     )
 })
@@ -835,7 +906,8 @@ output$table_promedios_semana <- DT::renderDataTable({
     df_filtrado <- datos_para_kpi_y_tabla() # Reutiliza los datos ya filtrados
     peso_promedio <- mean(df_filtrado$PESO_BRUTO, na.rm = TRUE)
     valueBox(
-      value =  paste(round(peso_promedio, 2), "Lb"), "Peso Promedio (Semana)", 
+      value =  paste(round(peso_promedio, 2), "Lb"), 
+      subtitle = "Peso Promedio (Semana)",  # << CORREGIDO
       icon = icon("weight-hanging"), color = "green"
     )
   })
@@ -844,7 +916,8 @@ output$table_promedios_semana <- DT::renderDataTable({
     df_filtrado <- datos_para_kpi_y_tabla()
     calibre_promedio <- mean(df_filtrado$CALIBRACION_SUP, na.rm = TRUE)
     valueBox(
-      value =  paste(round(calibre_promedio, 2), ""), "Calibre Promedio (Semana)", 
+      value =  paste(round(calibre_promedio, 2), ""),
+      subtitle = "Calibre Promedio (Semana)",  # << CORREGIDO
       icon = icon("ruler-horizontal"), color = "yellow"
     )
   })
@@ -853,7 +926,8 @@ output$table_promedios_semana <- DT::renderDataTable({
     df_filtrado <- datos_para_kpi_y_tabla()
     edad_promedio <- mean(df_filtrado$Edad, na.rm = TRUE)
     valueBox(
-      value =  paste(round(edad_promedio, 2), ""), "Edad Promedio (Semana)", 
+      value =  paste(round(edad_promedio, 2), ""),
+      subtitle = "Edad Promedio (Semana)",  # << CORREGIDO
       icon = icon("calendar-day"), color = "blue"
     )
   })
