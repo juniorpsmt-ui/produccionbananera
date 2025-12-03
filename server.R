@@ -31,6 +31,8 @@ server <- function(input, output, session) {
   
   user_email_js <- reactiveVal(NULL)
   
+  
+  
   # --- A. INICIALIZACIÓN DE FIREBASE Y COMPONENTES JS ---
   observe({
     api_key <- "AIzaSyC20-K42ErsY-bKKeHKBxIecJ6FaXbadXw" 
@@ -101,6 +103,10 @@ server <- function(input, output, session) {
     # 2. Ejecutar código JS para limpiar los campos de entrada
     shinyjs::runjs("$('#login_email').val(''); $('#login_password').val('');")
   })
+  
+  
+  
+  
   # --- 4. OBTENER INFORMACIÓN DEL USUARIO Y MAPEO DE ROLES ---
   user_info <- reactive({
     current_user_email <- user_email_js() 
@@ -130,6 +136,10 @@ server <- function(input, output, session) {
     )
   })
   
+  
+  
+  
+  
   # --- 5. FILTRADO DE DATOS CRUCOS POR EMPRESA (Reactivo) ---
   
   datos_filtrados_crudos <- reactive({
@@ -138,14 +148,24 @@ server <- function(input, output, session) {
     
     req(nrow(datos_banano_raw) > 0)
     
+    data <- datos_banano_raw
+    
     if (user$role == "SUPER_ADMIN") {
-      return(datos_banano_raw)
-    } else {
-      # Filtra datos solo para la empresa del usuario
-      return(datos_banano_raw %>% filter(EMPRESA == user$empresa_id))
+      return( data)
     }
+    # 3. FILTRO ADICIONAL PARA JEFE DE SECTOR
+    # Si el rol es JEFE_SECTOR, debe filtrar los datos por su propio nombre
+    # *** REQ: Asumiendo que el campo user$name (o user$user) contiene el nombre del Jefe de Sector ***
+    if (user$role == "JEFE_SECTOR") {
+      # Esta línea asume que el nombre del usuario logueado coincide con el valor en la columna Jefe_Sector
+      data <- data %>% filter(jesector == user$name) 
+      
+      # NOTA: Debes asegurarte de que tu archivo 'usuarios.csv' mapee correctamente
+      # el 'user' con el 'name' (o 'Jefe_Sector' si lo tienes en la base de datos de usuarios).
+    }
+    
+    return(data)
   })
-  
   
   
   
@@ -189,7 +209,7 @@ server <- function(input, output, session) {
         Has, # Columnas estandarizadas
         
         
-        
+        jesector,
         # Mantener otras columnas necesarias para los KPIs/Tablas existentes
         `Peso raquis`, Rechazado, Recuperado, `Numero de manos`, palanca, Defecto, `Generador de merma`, EdDi, `Tipo de plantacion`, TPId, MC
         # Mantener TASA_RECHAZO y RECUSADOS (si existen en el data.frame)
@@ -225,9 +245,23 @@ server <- function(input, output, session) {
     if (!is.null(input$filtro_semana) && input$filtro_semana != "Todos") {
       data <- data %>% filter(SEMANA_COSECHA == input$filtro_semana)
     }
+
+    # 4. FILTRO POR JEFE DE SECTOR (Nuevo Filtro)
+    # Solo aplicamos este filtro si el usuario tiene permiso para elegir
+    if (!is.null(input$filtro_jesector) && input$filtro_jesector != "Todos") {
+      data <- data %>% filter(jesector == input$filtro_jesector)
+    }
     
+    # NOTA IMPORTANTE: Si el rol es JEFE_SECTOR, la función datos_filtrados_crudos()
+    # ya ha aplicado un filtro permanente (user$name), por lo que el filtro de la UI
+    # no afectará a ese usuario, lo cual es correcto.
+    
+        
     return(data)
   })
+  
+  
+  
   
   
   # --- 8B. LÓGICA DEL REPORTE ADMINISTRATIVO (Agrupación y Resumen) ---
@@ -354,6 +388,51 @@ server <- function(input, output, session) {
   
   
   
+  # --- 8D. LÓGICA DEL REPORTE POR JEFE DE SECTOR (Agrupación por Semana) ---
+  
+  reporte_sector_semana <- reactive({
+    # Usamos los datos filtrados por la interfaz global
+    data <- datos_para_kpi_y_tabla() 
+    
+    # *** REQ: Asumiendo que la columna 'Jefe_Sector' existe en data ***
+    req(nrow(data) > 0)
+    
+    data %>%
+      dplyr::group_by(jesector, SEMANA_COSECHA) %>% # Agrupamos por Jefe y Semana
+      dplyr::summarise(
+        Peso_Bruto_Promedio = mean(PESO_BRUTO, na.rm = TRUE),
+        Calibracion_Promedio = mean(CALIBRACION_SUP, na.rm = TRUE),
+        Total_Racimos = n(),
+        .groups = 'drop'
+      ) %>%
+      dplyr::ungroup()
+  })
+  
+  
+  
+  # --- 8E. LÓGICA DE CÁLCULO DE KPIS GLOBALES PARA EL SECTOR ---
+  reporte_sector_kpis <- reactive({
+    data <- datos_para_kpi_y_tabla()
+    req(nrow(data) > 0)
+    
+    data %>%
+      dplyr::summarise(
+        Peso_Promedio_Sector = mean(PESO_BRUTO, na.rm = TRUE),
+        Racimos_Totales = n(),
+        # Cálculo de Rendimiento: (Peso Bruto Total / Total de Hectáreas Únicas)
+        # NOTA: Para un cálculo preciso, se necesita la fecha/semana de cosecha. 
+        # Simplificamos como el total de peso entre el total de racimos (ya tenemos el promedio),
+        # o simplemente usamos un KPI de Peso Promedio.
+        Hectareas_Unicas = sum(unique(Has), na.rm = TRUE) # Suma de hectáreas únicas en la selección
+      )
+  })
+  
+  
+  
+  
+  
+  
+  
   
   # --- 6. RENDERIZACIÓN DEL DASHBOARD Y MENÚ CONDICIONAL ---
   output$sidebar_menu <- renderUI({
@@ -377,6 +456,10 @@ server <- function(input, output, session) {
           menuItem("📊 Reporte Administrativo General por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
           # *** NUEVA PESTAÑA 2: REPORTE POR SEMANA ***
           menuItem("📅 Reporte Administrativo por Semana", tabName = "tab_reporte_admin_semana", icon = icon("calendar-alt")),
+          
+          # 🌟 NUEVA PESTAÑA: Reporte por Jefe de Sector
+          menuItem("👤 Reporte por Sector/Jefe", tabName = "tab_reporte_sector", icon = icon("user-tie")),
+          
           menuItem("❌ Tasa de Rechazo", tabName = "tab_rechazo", icon = icon("times")),
           menuItem("🔬 Optimización por Edad", tabName = "tab_edad", icon = icon("leaf")),
           
@@ -451,10 +534,13 @@ server <- function(input, output, session) {
           box(title = "Filtros de Exploración", status = "warning", solidHeader = TRUE, width = 12,
               class = "compact-box-kpi",
               column(width = 12,
-                     column(width = 3, uiOutput("ui_filtro_empresa")),
-                     column(width = 3, uiOutput("ui_filtro_ano")),
-                     column(width = 3, uiOutput("ui_filtro_hacienda")),
-                     column(width = 3, uiOutput("ui_filtro_semana"))
+                     column(width = 2, uiOutput("ui_filtro_empresa")),
+                     column(width = 2, uiOutput("ui_filtro_ano")),
+                     column(width = 2, uiOutput("ui_filtro_hacienda")),
+                     column(width = 2, uiOutput("ui_filtro_semana")),
+                     
+                     # 🌟 ¡NUEVO FILTRO AÑADIDO! 🌟
+                     column(width = 2, uiOutput("ui_filtro_jesector"))
               )
           )
         ),
@@ -517,6 +603,42 @@ server <- function(input, output, session) {
           ),
           
           
+          
+          # 🌟 NUEVO TABITEM: Reporte por Jefe de Sector
+          tabItem(tabName = "tab_reporte_sector",
+                  h2("Reporte de Productividad por Jefe de Sector"),
+                  
+                  # Filtros (Reutiliza los filtros globales)
+                  # Aquí puedes añadir un filtro específico si fuera necesario:
+                  # column(width = 3, uiOutput("ui_filtro_jefe_sector")), 
+                  
+                  # KPIS (Opcional, pero recomendado)
+                  fluidRow(
+                    # Puedes usar nuevos KPIs con IDs únicos:
+                    valueBoxOutput("kpi_racimos_sector", width = 3),
+                    valueBoxOutput("kpi_rendimiento_sector", width = 3),
+                    valueBoxOutput("kpi_peso_sector", width = 3)
+                  ),
+                  
+                  # Gráficos Lineales (Tendencias)
+                  fluidRow(
+                    box(title = "Tendencia de Peso Promedio (Semana vs. Lote)", status = "primary", solidHeader = TRUE, width = 12,
+                        tabBox(width = 12, 
+                               # Tabulador 1: Peso por Semana
+                               tabPanel("Peso por Semana", icon = icon("chart-line"), 
+                                        plotOutput("plot_peso_sector_semana")),
+                               # Tabulador 2: Peso por Lote
+                               tabPanel("Peso por Lote", icon = icon("chart-area"),
+                                        plotOutput("plot_peso_sector_lote"))
+                        )
+                    )
+                  )
+          ),
+          
+          
+          
+          
+          
                      # 2. Pestaña de Tasa de Rechazo (El tabItem original)
           tabItem(tabName = "tab_rechazo",
                   h2("Análisis de Pérdidas y Recusados"),
@@ -573,7 +695,7 @@ output$table_promedios <- DT::renderDataTable({
     # *** CAMBIO 1: Habilitar la extensión de Botones ***
     extensions = 'Buttons',
     
-    options = list(pageLength = 10, scrollX = TRUE, 
+    options = list(pageLength = 50, scrollX = TRUE, 
                    lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
     
                    # *** CAMBIO 2: Definir la estructura (dom) e incluir los botones (B) ***
@@ -690,7 +812,7 @@ output$table_promedios_semana <- DT::renderDataTable({
     extensions = 'Buttons',
     
     options = list(
-      pageLength = 10,
+      pageLength = 50,
       scrollX = TRUE,
       lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
       dom = 'lBfrtip',
@@ -840,9 +962,31 @@ output$table_promedios_semana <- DT::renderDataTable({
   })
   
   
+  ################################
   
   
+  # --- 7E. FILTRO DE JEFE DE SECTOR (para SUPER_ADMIN / ADMIN_EMPRESA) ---
+  output$ui_filtro_jesector <- renderUI({
+    user <- user_info()
+    
+    # Solo mostrar si el usuario puede ver múltiples sectores
+    if (user$role %in% c("SUPER_ADMIN", "ADMIN_EMPRESA")) { 
+      data <- datos_dashboard() # Usa la data ya filtrada por empresa/año, si aplica
+      req(nrow(data) > 0)
+      
+      # Obtener los nombres únicos de Jefe de Sector, añadir 'Todos'
+      choices <- sort(unique(data$jesector))
+      
+      selectInput(
+        "filtro_jesector",
+        "Filtrar por Jefe de Sector:",
+        choices = c("Todos", choices),
+        selected = "Todos"
+      )
+    }
+  })
   
+  ########################################
   
   
   
@@ -991,4 +1135,116 @@ output$table_promedios_semana <- DT::renderDataTable({
     data %>% select(LOTE_ID, Edad, PESO_BRUTO, CALIBRACION_SUP) %>% 
       DT::datatable(options = list(pageLength = 5), rownames = FALSE)
   })
+  
+  
+  
+  
+  
+  
+  # --- 10B. RENDERIZACIÓN DE KPIS PARA EL REPORTE POR SECTOR ---
+  
+  # KPI 1: Peso Promedio del Sector
+  output$kpi_peso_sector <- renderValueBox({
+    df_kpis <- reporte_sector_kpis()
+    req(df_kpis)
+    
+    valueBox(
+      paste0(round(df_kpis$Peso_Promedio_Sector, 2), " Lb"),
+      "Peso Promedio Total",
+      icon = icon("weight-hanging"),
+      color = "green"
+    )
+  })
+  
+  # KPI 2: Total de Racimos Cosechados
+  output$kpi_racimos_sector <- renderValueBox({
+    df_kpis <- reporte_sector_kpis()
+    req(df_kpis)
+    
+    valueBox(
+      format(df_kpis$Racimos_Totales, big.mark = ","),
+      "Racimos Totales Cosechados",
+      icon = icon("cubes"),
+      color = "blue"
+    )
+  })
+  
+  # KPI 3: Rendimiento (Usamos Calibre Promedio como proxy de calidad del rendimiento)
+  output$kpi_rendimiento_sector <- renderValueBox({
+    # Usamos la data semanal para obtener un promedio de calibración (proxy de rendimiento)
+    df_sector <- reporte_sector_semana()
+    req(nrow(df_sector) > 0)
+    
+    calibre_promedio <- mean(df_sector$Calibracion_Promedio, na.rm = TRUE)
+    
+    valueBox(
+      paste0(round(calibre_promedio, 1)),
+      "Calibre Promedio Sector",
+      icon = icon("ruler-horizontal"),
+      color = "orange"
+    )
+  })
+  
+  
+  
+  # --- 11. Gráficos para el Reporte por Sector ---
+  
+  output$plot_peso_sector_semana <- renderPlot({
+    df_sector <- reporte_sector_semana()
+    req(nrow(df_sector) > 0)
+    
+    df_sector %>%
+      ggplot(aes(x = SEMANA_COSECHA, y = Peso_Bruto_Promedio, group = jesector, color = jesector)) +
+      geom_line(size = 1.2) +
+      geom_point(size = 3) +
+      labs(
+        title = "Tendencia Semanal del Peso Promedio por Jefe de Sector",
+        x = "Semana de Cosecha",
+        y = "Peso Promedio (Lb)",
+        color = "Jefe de Sector"
+      ) +
+      theme_minimal(base_size = 14) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotar etiquetas X
+  
+    
+    })
+  
+  
+  # --- 11. Gráficos para el Reporte por Sector (Continuación) ---
+  
+  # Gráfico de Tendencia de Peso por Lote (Pestaña 2)
+  output$plot_peso_sector_lote <- renderPlot({
+    data <- datos_para_kpi_y_tabla()
+    req(nrow(data) > 0)
+    
+    # 1. Agrupar por Lote y Semana para obtener el Peso Promedio
+    df_lote_semana <- data %>%
+      dplyr::group_by(LOTE_ID, SEMANA_COSECHA) %>%
+      dplyr::summarise(Peso_Promedio = mean(PESO_BRUTO, na.rm = TRUE), .groups = 'drop')
+    
+    req(nrow(df_lote_semana) > 0)
+    
+    # 2. Creación del gráfico
+    df_lote_semana %>%
+      ggplot(aes(x = SEMANA_COSECHA, y = Peso_Promedio, group = LOTE_ID, color = LOTE_ID)) +
+      geom_line(size = 1) +
+      geom_point(size = 2) +
+      labs(
+        title = "Tendencia Semanal del Peso Promedio por Lote",
+        x = "Semana de Cosecha",
+        y = "Peso Promedio (Lb)",
+        color = "Lote ID"
+      ) +
+      theme_minimal(base_size = 14) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      # Si tienes muchos lotes, ajusta la leyenda o usa facet_wrap si es necesario
+      guides(color = guide_legend(ncol = 2)) 
+  })
+  
+  
+  
+  
+  
+  
+  
 }
