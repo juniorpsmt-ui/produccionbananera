@@ -12,8 +12,13 @@ library(tibble) # Necesario para crear tibbles de emergencia
 
 # --- 1. LECTURA DE DATOS DESDE ARCHIVOS CSV Y EXCEL ---
 tryCatch({
-  datos_banano_raw <- read_excel("Racimos Cosechados Semana 45-1 - 2025 - Total.xlsx") 
-  user_base <- read.csv("usuarios.csv", sep = ";", stringsAsFactors = FALSE)
+  # datos_banano_raw <- read_excel("Racimos Cosechados Semana 45-1 - 2025 - TotalCSV.csv") 
+  
+  datos_banano_raw <- read_csv2("Racimos Cosechados Semana 45-1 - 2025 - TotalCSV.csv")
+
+  print(sapply(datos_banano_raw, class))
+
+      user_base <- read.csv("usuarios2.csv", sep = ";", stringsAsFactors = FALSE)
   
 }, error = function(e) {
   warning(paste("Error al cargar o procesar archivos:", e$message))
@@ -24,7 +29,7 @@ tryCatch({
 })
 
 
-# View( datos_banano_raw)
+View( datos_banano_raw)
 
 
 server <- function(input, output, session) {
@@ -112,7 +117,8 @@ server <- function(input, output, session) {
     current_user_email <- user_email_js() 
     req(current_user_email) 
     
-    user_data <- user_base %>%
+    
+       user_data <- user_base %>%
       filter(user == current_user_email) %>%
       {
         if (nrow(.) == 0) {
@@ -120,7 +126,13 @@ server <- function(input, output, session) {
             user = current_user_email,
             permissions = "OPERADOR_CADENA", 
             empresa_id = "EMP_DEFAULT",
-            name = sub("@.*", "", current_user_email)
+            name = sub("@.*", "", current_user_email),
+            
+            
+            # ✅ CORRECCIÓN CLAVE: Aseguramos que la columna exista con un valor por defecto
+            jefe_sector_asignado = "N/A"
+            
+            
           )
         } else {
           .
@@ -130,9 +142,13 @@ server <- function(input, output, session) {
     list(
       logged_in = TRUE,
       user = user_data$user[1],
+      email = user_data$user,
       role = user_data$permissions[1],
       empresa_id = user_data$empresa_id[1],
-      name = user_data$name[1]
+      name = user_data$name[1],
+      # ✅ CORRECCIÓN CLAVE: Usamos 'tryCatch' para asignar un valor por defecto si falla
+      # El error 'size 0' ocurrirá si la columna no existe. Esto lo previene.
+      jesector = tryCatch(user_data$jefe_sector_asignado[1], error = function(e) {"N/A"}) 
     )
   })
   
@@ -157,11 +173,12 @@ server <- function(input, output, session) {
     # Si el rol es JEFE_SECTOR, debe filtrar los datos por su propio nombre
     # *** REQ: Asumiendo que el campo user$name (o user$user) contiene el nombre del Jefe de Sector ***
     if (user$role == "JEFE_SECTOR") {
-      # Esta línea asume que el nombre del usuario logueado coincide con el valor en la columna Jefe_Sector
-      data <- data %>% filter(jesector == user$name) 
+      # ✅ CORRECCIÓN 1: Aplicar limpieza de formato al valor del usuario
+      user_jesector_limpio <- toupper(trimws(user$jesector))
       
-      # NOTA: Debes asegurarte de que tu archivo 'usuarios.csv' mapee correctamente
-      # el 'user' con el 'name' (o 'Jefe_Sector' si lo tienes en la base de datos de usuarios).
+      # Aplicamos el filtro usando el valor limpio y limpiando también la columna de la data
+      data <- data %>% 
+        dplyr::filter(toupper(trimws(jesector)) == user_jesector_limpio) 
     }
     
     return(data)
@@ -172,10 +189,14 @@ server <- function(input, output, session) {
   # --- 5B. Lógica de Mapeo y Preparación de Columnas (Estabilización) --- los llama los kpi que estan abajo aqui se preparan los datos 
   
   datos_dashboard <- reactive({
+    
+    
+    # user <- user_info()
+    
     data <- datos_filtrados_crudos()
     req(nrow(data) > 0)
         # *** CORRECCIÓN DE COLUMNAS Y PREPARACIÓN MÍNIMA ***
-    data %>%
+    data <- data %>%
       # 1. Renombramos las columnas con nombres problemáticos a nombres internos sin espacios
       rename(
         LOTE_ID = Lote, 
@@ -183,7 +204,9 @@ server <- function(input, output, session) {
         CALIBRACION_SUP = `Calibracion superior`, # ¡CORREGIDO!
         SEMANA_COSECHA = `Semana de cosecha`, # ¡CORREGIDO!
         EMPRESA_ID_FILTRO = EMPRESA,
-        Has = has
+        Has = has,
+        # ✅ CAMBIO CLAVE 1: Renombrar para consistencia con el filtro
+        
         
         # Asumiendo que las columnas RECUSADOS y TASA_RECHAZO existen o se definen en el Excel/raw
         # Si no existen, los KPIs de Rechazo seguirán fallando.
@@ -206,14 +229,35 @@ server <- function(input, output, session) {
       select(
         EMPRESA_ID_FILTRO, HACIENDA, Ano, LOTE_ID, SEMANA_COSECHA, Edad, Cinta, 
         PESO_BRUTO, CALIBRACION_SUP, # *** INCLUIMOS 'Has' EN EL DATASET DE TRABAJO ***
-        Has, # Columnas estandarizadas
-        
+        Has, # Columnas estandarizadasJefe_Sector,
         
         jesector,
+        
+     
         # Mantener otras columnas necesarias para los KPIs/Tablas existentes
         `Peso raquis`, Rechazado, Recuperado, `Numero de manos`, palanca, Defecto, `Generador de merma`, EdDi, `Tipo de plantacion`, TPId, MC
         # Mantener TASA_RECHAZO y RECUSADOS (si existen en el data.frame)
       )
+    
+    
+    # ------------------------------------------------------------------
+    # --- 🔒 APLICACIÓN DEL FILTRO DE SEGURIDAD (RLS) ---
+    # ------------------------------------------------------------------
+    
+    # Solo aplicamos el filtro si el usuario tiene el rol JEFE_SECTOR
+     #  if (user$role == "JEFE_SECTOR") {
+    #  data <- data %>%
+        # Filtramos la columna renombrada ('Jefe_Sector') 
+        # usando el valor capturado en user_info() ('user$jesector')
+    #    dplyr::filter(Jefe_Sector == user$jesector)
+  #  }
+    
+    # Asumo que el filtro por EMPRESA_ID_FILTRO ya lo tienes implementado en este punto si aplica.
+    
+    return(data)
+    
+    
+    
   })
   
   
