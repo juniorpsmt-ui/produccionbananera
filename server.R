@@ -11,7 +11,9 @@ library(readxl) # Para leer el archivo Excel
 library(tibble) # Necesario para crear tibbles de emergencia
 library(data.table)
 
-
+# Al inicio de tu archivo
+if (!require("data.table")) install.packages("data.table")
+library(data.table)
 # --- 1. LECTURA DE DATOS DESDE ARCHIVOS CSV Y EXCEL ---
 tryCatch({
   # datos_banano_raw <- read_excel("Racimos Cosechados Semana 45-1 - 2025 - TotalCSV.csv") 
