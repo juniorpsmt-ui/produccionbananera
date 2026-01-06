@@ -9,14 +9,23 @@ library(shinyjs)
 library(readr) # Necesario para leer archivos CSV
 library(readxl) # Para leer el archivo Excel
 library(tibble) # Necesario para crear tibbles de emergencia
+library(data.table)
+
 
 # --- 1. LECTURA DE DATOS DESDE ARCHIVOS CSV Y EXCEL ---
 tryCatch({
   # datos_banano_raw <- read_excel("Racimos Cosechados Semana 45-1 - 2025 - TotalCSV.csv") 
+  # ANTES: datos_banano_raw <- read_csv2("Racimos Cosechados Semana 45-1 - 2025 - TotalCSV.csv")
   
-  datos_banano_raw <- read_csv2("Racimos Cosechados Semana 45-1 - 2025 - TotalCSV.csv")
-
-  print(sapply(datos_banano_raw, class))
+  # ✅ CORRECCIÓN DE MEMORIA: Usar fread para lectura rápida y eficiente
+  datos_banano_raw <- data.table::fread("Racimos Cosechados Semana 45-1 - 2025 - TotalCSV.csv", 
+                                        sep = ";", 
+                                        encoding = "UTF-8")
+  
+  # Convertir a tibble/data.frame si la lógica subsiguiente de dplyr lo requiere
+  datos_banano_raw <- as_tibble(datos_banano_raw) 
+  
+ # print(sapply(datos_banano_raw, class))
 
       user_base <- read.csv("usuarios2.csv", sep = ";", stringsAsFactors = FALSE)
   
@@ -32,61 +41,154 @@ tryCatch({
 #View( datos_banano_raw)
 
 
+
+
 server <- function(input, output, session) {
+ 
   
+  
+   
   user_email_js <- reactiveVal(NULL)
   
   
   
-  # --- A. INICIALIZACIÓN DE FIREBASE Y COMPONENTES JS ---
+  # --- 3. INICIALIZACIÓN DE FIREBASE Y COMPONENTES JS (server.R) ---
   observe({
-    api_key <- "AIzaSyC20-K42ErsY-bKKeHKBxIecJ6FaXbadXw" 
-    auth_domain <- "bdspb-f17f3.firebaseapp.com" 
+    # 🚨 Asegúrate de que estos datos sean correctos 🚨
+    api_key <- "AIzaSyC20-K42ErsY-bKKeHKBxIecJ6FaXbadXw"  
+    auth_domain <- "bdspb-f17f3.firebaseapp.com"  
+    project_id <- "bdspb-f17f3" 
     
     js_init <- sprintf("
-      var firebaseConfig = { 
-        apiKey: '%s', 
-        authDomain: '%s' 
-      }; 
-      var app = firebase.initializeApp(firebaseConfig);
-      var auth = firebase.auth();
-      
-      auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
-      auth.onAuthStateChanged(function(user) {
-        if (user) {
-          Shiny.setInputValue('firebase_user_email', user.email);
-          document.getElementById('login_panel').style.display = 'none';
-        } else {
-          Shiny.setInputValue('firebase_user_email', null);
-          document.getElementById('login_panel').style.display = 'block';
-        }
-      });
+    // Variable global para acceder al objeto de autenticación
+    var globalFirebaseAuth = null; 
 
-      $('#login_submit').on('click', function() {
-        var email = $('#login_email').val();
-        var password = $('#login_password').val();
+    // Las funciones addCustomMessageHandler deben estar fuera de $(document).ready
+    // para que R las reconozca inmediatamente.
+    
+    // 1. Manejador de Login (Usa la variable global y tiene chequeo fatal)
+    Shiny.addCustomMessageHandler('do_login_js', function(data) {
         
-        auth.signInWithEmailAndPassword(email, password)
-          .catch(function(error) {
-            if (error.code === 'auth/user-not-found') {
-                auth.createUserWithEmailAndPassword(email, password)
-                    .then(function() {
-                        Shiny.setInputValue('login_status', 'Registro exitoso.', {priority: 'event'});
-                    })
-                    .catch(function(error) {
-                        Shiny.setInputValue('login_status', error.message, {priority: 'event'});
-                    });
-            } else {
-                Shiny.setInputValue('login_status', error.message, {priority: 'event'});
-            }
-          });
-      });
-      
-      Shiny.addCustomMessageHandler('sign_out', function(message) {
-          auth.signOut();
-      });
-    ", api_key, auth_domain)
+        document.getElementById('login_message').innerHTML = '';
+        
+        // Chequeo de que el objeto AUTH esté cargado
+        if (!globalFirebaseAuth) {
+             var msg = 'ERROR FATAL: El servicio de autenticación no se cargó.';
+             document.getElementById('login_message').innerHTML = msg;
+             alert(msg); // Forzar la visibilidad del error
+             return;
+        }
+
+        globalFirebaseAuth.signInWithEmailAndPassword(data.email, data.password)
+            .catch(function(error) {
+                var message = error.message;
+                
+                if (error.code === 'auth/user-not-found') {
+                    // Lógica de registro
+                    globalFirebaseAuth.createUserWithEmailAndPassword(data.email, data.password) 
+                        .then(function() {
+                            message = 'Registro exitoso. Intente iniciar sesión.';
+                        })
+                        .catch(function(error) {
+                            message = 'Error al registrar: ' + error.message;
+                        });
+                }
+                
+                document.getElementById('login_message').innerHTML = message;
+                Shiny.setInputValue('login_status', message, {priority: 'event'}); 
+            });
+    });
+
+    // 2. Manejador de Guardado de Enfunde (Con chequeo de Firestore y try/catch agresivo)
+    Shiny.addCustomMessageHandler('save_enfunde_data', function(data) {
+        // Usamos el try/catch para capturar cualquier error de ejecución inmediato (ej. Firestore no cargado).
+        try {
+            firebase.firestore().collection('enfunde_registros').add(data)
+                .then(function(docRef) {
+                    Shiny.setInputValue('firebase_save_status', 'Registro de Enfunde exitoso. ID: ' + docRef.id, {priority: 'event'});
+                })
+                .catch(function(error) {
+                    // Fallo de Firestore/Reglas de Seguridad
+                    console.error('Error de Firestore:', error.message);
+                    alert('ERROR (Consola F12): ' + error.message); // Muestra el error de las reglas
+                    Shiny.setInputValue('firebase_save_status', 'Error al guardar en Firestore: ' + error.message, {priority: 'event'});
+                });
+        } catch (e) {
+            // Fallo de inicialización
+            alert('ERROR FATAL EN JS: ' + e.message);
+            Shiny.setInputValue('firebase_save_status', 'ERROR INTERNO: Fallo en la llamada a Firestore (' + e.message + ')', {priority: 'event'});
+        }
+    });
+
+    // 3. Manejador de Sign Out (Corregido para usar variable global)
+    Shiny.addCustomMessageHandler('sign_out', function(message) { 
+        if (globalFirebaseAuth) {
+            globalFirebaseAuth.signOut();
+        } else {
+            // Forzar la interfaz al login si el objeto auth falla
+            document.getElementById('login_panel').style.display = 'block';
+            alert('ERROR: Fallo al cerrar sesión. Limpie el caché del navegador si persiste.');
+        }
+    });
+
+
+
+    // 🚨 BLOQUE CRÍTICO: Inicialización envuelta en $(document).ready
+    $(document).ready(function() {
+        var firebaseConfig = { 
+          apiKey: '%s', 
+          authDomain: '%s',
+          projectId: '%s' // Campo CRÍTICO
+        }; 
+        
+        var app = firebase.initializeApp(firebaseConfig);
+        
+        // 🚨 ASIGNAR LA INSTANCIA DE AUTH A LA VARIABLE GLOBAL
+        globalFirebaseAuth = app.auth(); 
+        
+        // Desactivar Persistencia (NONE) para forzar login en cada inicio
+        globalFirebaseAuth.setPersistence(firebase.auth.Auth.Persistence.NONE); 
+        
+        // Manejo de Estado (onAuthStateChanged)
+        globalFirebaseAuth.onAuthStateChanged(function(user) {
+          if (user) {
+            Shiny.setInputValue('firebase_user_email', user.email, {priority: 'event'});
+            document.getElementById('login_panel').style.display = 'none';
+          } else {
+            Shiny.setInputValue('firebase_user_email', null, {priority: 'event'});
+            document.getElementById('login_panel').style.display = 'block';
+          }
+        });
+    });
+
+
+// 4. Manejador de Consulta Semanal con ALERTA de depuración
+    Shiny.addCustomMessageHandler('consultar_enfunde_semanal', function(params) {
+        console.log('Iniciando consulta para Semana:', params.semana, 'Hacienda:', params.hacienda);
+        
+        firebase.firestore().collection('enfunde_registros')
+            .where('SEMANA', '==', parseInt(params.semana))
+            .where('HACIENDA', '==', params.hacienda)
+            .get()
+            .then(function(querySnapshot) {
+                var resultados = [];
+                querySnapshot.forEach(function(doc) {
+                    resultados.push(doc.data());
+                });
+                
+                // --- ALERTA DE PRUEBA ---
+                alert('Firestore respondió: Se encontraron ' + resultados.length + ' registros para la semana ' + params.semana);
+                
+                Shiny.setInputValue('datos_desde_firestore', JSON.stringify(resultados));
+            })
+            .catch(function(error) {
+                alert('Error en Firestore: ' + error.message);
+                console.error('Error en Firestore consulta: ', error);
+            });
+    });
+
+  ", api_key, auth_domain, project_id)
     
     shinyjs::runjs(js_init)
   })
@@ -110,12 +212,31 @@ server <- function(input, output, session) {
   })
   
   
+  # --- 4. MANEJADOR DEL BOTÓN DE LOGIN EN R (DEBE SER NUEVO) ---
+  # Este bloque llama a la función 'do_login_js' en el JS
+  observeEvent(input$login_submit, {
+    
+    email <- input$login_email
+    password <- input$login_password
+    
+    # 2. Enviamos las credenciales al manejador JS que interactúa con Firebase
+    session$sendCustomMessage(
+      type = 'do_login_js', 
+      message = list(email = email, password = password)
+    )
+  })
+  
+  
+  
   
   
   # --- 4. OBTENER INFORMACIÓN DEL USUARIO Y MAPEO DE ROLES ---
   user_info <- reactive({
     current_user_email <- user_email_js() 
     req(current_user_email) 
+    
+    # Debug: Se activa el RLS
+    print(paste("Usuario autenticado:", current_user_email))
     
     
        user_data <- user_base %>%
@@ -151,6 +272,7 @@ server <- function(input, output, session) {
       jesector = tryCatch(user_data$jefe_sector_asignado[1], error = function(e) {"N/A"}) 
     )
   })
+
   
   
   
@@ -164,6 +286,9 @@ server <- function(input, output, session) {
     
     req(nrow(datos_banano_raw) > 0)
     
+    # Debug: Se activa la carga de datos
+    print(paste("Cargando datos para rol:", user$role))
+    
     data <- datos_banano_raw
     
     if (user$role == "SUPER_ADMIN") {
@@ -172,6 +297,7 @@ server <- function(input, output, session) {
     # 3. FILTRO ADICIONAL PARA JEFE DE SECTOR
     # Si el rol es JEFE_SECTOR, debe filtrar los datos por su propio nombre
     # *** REQ: Asumiendo que el campo user$name (o user$user) contiene el nombre del Jefe de Sector ***
+    
     if (user$role == "JEFE_SECTOR") {
       # ✅ CORRECCIÓN 1: Aplicar limpieza de formato al valor del usuario
       user_jesector_limpio <- toupper(trimws(user$jesector))
@@ -195,6 +321,11 @@ server <- function(input, output, session) {
     
     data <- datos_filtrados_crudos()
     req(nrow(data) > 0)
+    
+    # Debug: Se inicia la limpieza de datos
+    print("Iniciando limpieza y renombre de columnas en datos_dashboard")
+    
+    
         # *** CORRECCIÓN DE COLUMNAS Y PREPARACIÓN MÍNIMA ***
     data <- data %>%
       # 1. Renombramos las columnas con nombres problemáticos a nombres internos sin espacios
@@ -259,6 +390,112 @@ server <- function(input, output, session) {
     
     
   })
+  
+  #############################################################################
+  
+  
+  # --- 8F. Datos para los filtros del Formulario (RLS) ---
+  datos_form_enfunde <- reactive({
+    data <- datos_dashboard()
+    user <- user_info()
+    
+    # Si es JEFE_SECTOR, los datos ya están filtrados.
+    # Si es SUPER_ADMIN o ADMIN, mostramos todas las opciones, aunque por RLS solo
+    # nos interesa el JEFE_SECTOR.
+    
+    haciendas <- sort(unique(data$HACIENDA))
+    lotes <- sort(unique(data$LOTE_ID))
+    
+    # Asumimos que la lista de cintas es fija o proviene de otra fuente
+    cintas_colores <- c("NEGRO", "ROJO", "AZUL", "AMARILLO", "BLANCO", "VERDE", "CAFE", "LILA") 
+    
+    list(
+      haciendas = haciendas,
+      lotes = lotes,
+      cintas = cintas_colores
+    )
+  })
+  
+  ###########################################################
+  
+  
+  # --- 12. LÓGICA DE CÁLCULO DE TOTAL DE ENFUNDE ---
+  enfunde_total <- reactive({
+    sum(
+      input$enfunde_lun,
+      input$enfunde_mar,
+      input$enfunde_mie,
+      input$enfunde_jue,
+      input$enfunde_vie,
+      input$enfunde_sab,
+      input$enfunde_dom,
+      na.rm = TRUE
+    )
+  })
+  
+  output$kpi_enfunde_total <- renderInfoBox({
+    infoBox(
+      "Total Racimos (Semana)",
+      value = tags$b(enfunde_total()),
+      icon = icon("balance-scale"),
+      color = "purple"
+    )
+  })
+  
+  # --- 13. LÓGICA DE ENVÍO DE DATOS A FIREBASE ---
+  observeEvent(input$enfunde_submit, {
+    
+    print("¡Botón de Enfunde presionado en R!")
+    
+    user <- user_info()
+    req(user$logged_in)
+    
+    # 1. Crear el objeto de datos que coincide con la estructura
+    data_to_save <- list(
+      SEMANA = as.numeric(input$enfunde_semana),  # Asegurar tipo
+      HACIENDA = as.character(input$enfunde_hacienda),
+      # El Jefe de Sector se toma del usuario logueado (RLS)
+      `JEFE DE SECTOR` = user$name, 
+      EMPRESA = user$empresa_id,
+      LOTE = as.character(trimws(input$enfunde_lote)),
+      `COLOR CINTA` = input$enfunde_cinta,
+      
+      # Valores diarios y totales
+      LUNES = input$enfunde_lun,
+      MARTES = input$enfunde_mar,
+      MIERCOLES = input$enfunde_mie,
+      JUEVES = input$enfunde_jue,
+      VIERNES = input$enfunde_vie,
+      SABADO = input$enfunde_sab,
+      DOMINGO = input$enfunde_dom,
+      TOTAL = as.numeric(enfunde_total()),      # Asegurar tipo
+      
+      # Metadata
+      fecha_registro = as.character(Sys.time()),
+      user_email = as.character(user$user)
+    )
+    
+    # 2. Enviar el objeto de datos al manejador JS de Firebase (Paso 2)
+    session$sendCustomMessage(type = 'save_enfunde_data', message = data_to_save)
+  })
+  
+  # --- 14. Mostrar el estado de guardado de Firebase ---
+  output$save_status_message <- renderText({
+    req(input$firebase_save_status)
+
+    # 🚨 DEBUG CRÍTICO: Imprime el valor recibido directamente en la Consola de R
+    print(paste("Mensaje de Firebase recibido en R:", input$firebase_save_status))
+    
+        # Muestra el mensaje de éxito o error que regresa Firebase JS
+    input$firebase_save_status
+  })
+  
+  
+  
+  ##########################################################################################
+  
+  
+  
   
   
   
@@ -473,17 +710,30 @@ server <- function(input, output, session) {
   
   
   
-  
+
   
   
   
   
   # --- 6. RENDERIZACIÓN DEL DASHBOARD Y MENÚ CONDICIONAL ---
   output$sidebar_menu <- renderUI({
+    
+    
+ 
+    
+    
     user <- user_info()
     
     logout_button <- actionButton("logout_btn", "Salir", icon = icon("sign-out-alt"), 
                                   style = "color: white; background-color: #d9534f; border-color: #d9534f;")
+    
+    
+    
+    
+ 
+    
+    
+    
     
     dashboardPage(
       skin = "green",
@@ -495,17 +745,25 @@ server <- function(input, output, session) {
       dashboardSidebar(
         width = 300,
         sidebarMenu(
-          id = "tabs",
+          
+          
+          id ="tabsid",
+         selected = "tab_enfunde_ingreso",  
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
           menuItem("📊 Reporte Administrativo General por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
           # *** NUEVA PESTAÑA 2: REPORTE POR SEMANA ***
           menuItem("📅 Reporte Administrativo por Semana", tabName = "tab_reporte_admin_semana", icon = icon("calendar-alt")),
           
           # 🌟 NUEVA PESTAÑA: Reporte por Jefe de Sector
-          menuItem("👤 Reporte por Sector/Jefe", tabName = "tab_reporte_sector", icon = icon("user-tie")),
+          menuItem("👤 Reporte por Sector/Jefe",  tabName = "tab_reporte_sector", icon = icon("user-tie")),
+          
+          # 🌟 NUEVO MENU: ENFUNDE
+          menuItem("🏷️ Enfunde", tabName = "tab_enfunde_ingreso", icon = icon("tag") ),
           
           menuItem("❌ Tasa de Rechazo", tabName = "tab_rechazo", icon = icon("times")),
           menuItem("🔬 Optimización por Edad", tabName = "tab_edad", icon = icon("leaf")),
+          menuItem("🔬 Estimacion de Produccion", tabName = "tab_Estimacion", icon = icon("leaf")),
+          menuItem("🔬 Rolling de Produccion", tabName = "tab_Rolling", icon = icon("leaf")),
           
           if (user$role %in% c("SUPER_ADMIN", "ADMIN_EMPRESA")) {
             menuItem("⚙️ Gestión Multi-Empresa", tabName = "tab_admin", icon = icon("user-shield"))
@@ -513,13 +771,31 @@ server <- function(input, output, session) {
           menuItem("💡 Acerca del Sistema", tabName = "tab_info", icon = icon("info-circle"))
         )
       ),
+      
+      
+    
+      
       dashboardBody(
-        
+        tags$script(HTML("
+    $(document).on('click', '.sidebar-menu a', function() {
+      var tabName = $(this).attr('data-value');
+      Shiny.setInputValue('tabsid_manual', tabName);
+    });
+  ")),
         ###############################################################################
+        shinyjs::useShinyjs(),
+
         
         # *** ESTILOS CSS PARA COMPACTAR LA UI ***
         tags$head(
+          
+
+  
           tags$style(HTML("
+          /* Bloqueo total al cargar la página */
+   /* .bloqueado-inicial { display: none !important; }   */
+        /*  #filtros_globales_container { display: none; }*/
+          
              /* Compacta la altura de los boxes (Filtros y KPIs) */
              .compact-box-kpi .box-body,
              .compact-box-kpi .box-header {
@@ -563,39 +839,30 @@ server <- function(input, output, session) {
         # ******************************************************
         # *** FIN DE LA INYECCIÓN DE CSS ***
         # ********************
-        
+       
         
         h6(paste("Bienvenido,", user$name, " (Rol:", user$role, ")"), icon("hand-peace")),
 
-        
-        
+      
+       uiOutput("contenedor_filtros_global"),
        
         
         # ******************************************************
         # *** SOLUCIÓN: FILTROS GLOBALES (Fuera de tabItems) ***
         # ******************************************************
-        fluidRow(
-          box(title = "Filtros de Exploración", status = "warning", solidHeader = TRUE, width = 12,
-              class = "compact-box-kpi",
-              column(width = 12,
-                     column(width = 2, uiOutput("ui_filtro_empresa")),
-                     column(width = 2, uiOutput("ui_filtro_ano")),
-                     column(width = 2, uiOutput("ui_filtro_hacienda")),
-                     column(width = 2, uiOutput("ui_filtro_semana")),
-                     
-                     # 🌟 ¡NUEVO FILTRO AÑADIDO! 🌟
-                     column(width = 2, uiOutput("ui_filtro_jesector"))
-              )
-          )
-        ),
+     
+  
+       
         
-        tabItems(
+                tabItems(
 
           
                     # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
           # 1. Pestaña de Reporte Administrativo
           tabItem(tabName = "tab_reporte_admin",
                   h2("Reporte Administrativo: Parámetros de Producción por Lotes"),
+                  
+                
                   
                   # *** KPIS (Reutilizan los filtros globales)
                   # KPIS para LOTES (Mantienen los IDs originales)
@@ -620,7 +887,7 @@ server <- function(input, output, session) {
           tabItem(tabName = "tab_reporte_admin_semana",
                   h2("Reporte Administrativo: Parámetros de Producción por Semana"),
                   
-                
+                 
                  
                   
                   # *** KPIS (Reutilizan los filtros globales)
@@ -680,6 +947,25 @@ server <- function(input, output, session) {
           ),
           
           
+          # 🌟 NUEVO TABITEM: Ingreso de Datos de Enfunde
+          tabItem(tabName = "tab_enfunde_ingreso",
+                  h2("📝 Registro Diario de Enfunde"),
+                  
+                  
+                  # 🚨 DEBUG TEMPORAL: Muestra el ID de la pestaña activa 🚨
+                  verbatimTextOutput("debug_tab_id"),
+                  
+                  # Aquí irá el formulario (ver Paso 3)
+                  uiOutput("ui_enfunde_form") 
+          ),
+          
+     
+          
+          # 🌟 NUEVO TABITEM: Análisis de Enfunde (Vacío por ahora)
+          tabItem(tabName = "tab_enfunde_analisis",
+                  h2("📈 Análisis de Enfunde (KPIs y Tendencias)")
+          ),
+          
           
           
           
@@ -720,10 +1006,16 @@ server <- function(input, output, session) {
       )
   })
   
+  # --- En tu server.R (cerca de tus otros outputs/reactives) ---
+  
+  # 🚨 FUNCIÓN DE DEBUGGING TEMPORAL 🚨
+  output$debug_tab_id <- renderPrint({
+    # Imprime el valor de la pestaña activa (cuyo ID es "tabs" en el menú)
+    cat(paste("ID de Pestaña Activa (input$tabs):", input$tabs))
+  })
   
   
-  
-  
+
   
   # --- 9. RENDERIZACIÓN DE LA TABLA DEL REPORTE ADMINISTRATIVO ---
 output$table_promedios <- DT::renderDataTable({
@@ -982,6 +1274,10 @@ output$table_promedios_semana <- DT::renderDataTable({
     )
   })
   
+  
+  # --- LÓGICA PARA GENERAR EL FILTRO DE EMPRESAS (Solo si el usuario es SUPER_ADMIN) ---
+ 
+  
   # --- LÓGICA PARA GENERAR EL FILTRO DE EMPRESAS (Solo si el usuario es SUPER_ADMIN) ---
   output$ui_filtro_empresa <- renderUI({
     user <- user_info()
@@ -1030,14 +1326,155 @@ output$table_promedios_semana <- DT::renderDataTable({
     }
   })
   
-  ########################################
+  ###########################################################################################
+  
+  # --- 11. RENDERIZACIÓN DEL FORMULARIO DE ENFUNDE (RLS) ---
+  output$ui_enfunde_form <- renderUI({
+    user <- user_info()
+    form_data <- datos_form_enfunde()
+    
+    if (is.null(user$logged_in) || !user$logged_in) {
+      return(h4("Debe iniciar sesión para ingresar datos."))
+    }
+    
+    fluidPage(
+      # PRIMER BLOQUE: FORMULARIO
+      fluidRow(
+        box(title = "Datos de Ubicación y Fecha", status = "primary", solidHeader = TRUE, width = 4,
+            dateInput("enfunde_fecha", "Fecha de Enfunde", value = Sys.Date()),
+            numericInput("enfunde_semana", "Semana", value = as.numeric(format(Sys.Date(), "%W"))),
+            selectInput("enfunde_hacienda", "Hacienda (RLS)", choices = form_data$haciendas),
+            selectInput("enfunde_lote", "Lote (RLS)", choices = form_data$lotes),
+            selectInput("enfunde_cinta", "Color de Cinta", choices = form_data$cintas)
+        ),
+        
+        box(title = "Racimos Enfundados", status = "warning", solidHeader = TRUE, width = 4,
+            numericInput("enfunde_lun", "Lunes", value = 0, min = 0),
+            numericInput("enfunde_mar", "Martes", value = 0, min = 0),
+            numericInput("enfunde_mie", "Miércoles", value = 0, min = 0),
+            numericInput("enfunde_jue", "Jueves", value = 0, min = 0),
+            numericInput("enfunde_vie", "Viernes", value = 0, min = 0),
+            numericInput("enfunde_sab", "Sábado", value = 0, min = 0),
+            numericInput("enfunde_dom", "Domingo", value = 0, min = 0)
+        ),
+        
+        box(title = "Resumen y Envío", status = "success", solidHeader = TRUE, width = 4,
+            h4(paste("Jefe de Sector:", user$name)),
+            h4(paste("Empresa ID:", user$empresa_id)),
+            infoBoxOutput("kpi_enfunde_total", width = 12),
+            actionButton("enfunde_submit", "Guardar en Firebase", icon = icon("save"), 
+                         class = "btn-success btn-lg", width = "100%"),
+            br(), br(),
+            textOutput("save_status_message")
+        )
+      ), # <--- ESTA COMA ES OBLIGATORIA PARA SEPARAR LOS FLUIDROW
+      
+      # SEGUNDO BLOQUE: LISTADO/TABLA
+      fluidRow(
+        box(
+          title = "Listado de Lotes y Registros Semanales", 
+          status = "primary", # Cambiado a primary para que resalte
+          solidHeader = TRUE, 
+          width = 12,
+          column(width = 12,
+                 div(style = "display: inline-block; vertical-align:top; width: 250px;",
+                     numericInput("filtro_semana_consulta", "Ver Historial (Semana):", 
+                                  value = as.numeric(format(Sys.Date(), "%W")), min = 1, max = 53)),
+                 hr(),
+                 # Contenedor para la tabla
+                 DT::dataTableOutput("tabla_ingresos_semanales")
+          )
+        )
+      )
+    )
+  })
+  
+  
+  ##########################################################################################
+  
+  output$tabla_ingresos_semanales <- DT::renderDataTable({
+    mis_lotes <- lotes_del_sector()
+    req(mis_lotes)
+    
+    # 1. Crear tabla molde
+    tabla_final <- data.frame(
+      Lote = as.character(trimws(as.character(mis_lotes))),
+      LUNES = 0, MARTES = 0, MIERCOLES = 0, JUEVES = 0, 
+      VIERNES = 0, SABADO = 0, DOMINGO = 0,
+      stringsAsFactors = FALSE
+    )
+    
+    # 2. Recibir datos de JS
+    datos_raw <- input$datos_desde_firestore
+    
+    if (!is.null(datos_raw) && datos_raw != "" && datos_raw != "[]") {
+      
+      # Intentar decodificar el JSON con manejo de errores
+      datos_lista <- tryCatch({
+        jsonlite::fromJSON(datos_raw)
+      }, error = function(e) {
+        print(paste("Error decodificando JSON:", e$message))
+        return(NULL)
+      })
+      
+      if (!is.null(datos_lista)) {
+        # Convertir a dataframe y normalizar columnas a MAYÚSCULAS
+        datos_reales <- as.data.frame(datos_lista)
+        colnames(datos_reales) <- toupper(trimws(colnames(datos_reales)))
+        
+        # 3. CRUCE DE DATOS (MATCH)
+        if ("LOTE" %in% colnames(datos_reales)) {
+          for(i in 1:nrow(datos_reales)) {
+            
+            # Limpieza del lote de la DB
+            lote_db <- as.character(trimws(as.character(datos_reales$LOTE[i])))
+            
+            # Buscar en la tabla del Excel
+            fila_match <- which(tabla_final$Lote == lote_db)
+            
+            if (length(fila_match) > 0) {
+              dias <- c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO")
+              for(d in dias) {
+                if(d %in% colnames(datos_reales)) {
+                  valor <- as.numeric(as.character(datos_reales[i, d]))
+                  if(!is.na(valor)) {
+                    # Sumar el valor (importante si hay varios registros)
+                    tabla_final[fila_match, d] <- tabla_final[fila_match, d] + valor
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    # 4. Totales y Renderizado
+    tabla_final$Total <- rowSums(tabla_final[, 2:8], na.rm = TRUE)
+    
+    DT::datatable(tabla_final, rownames = FALSE, 
+                  options = list(dom = 't', pageLength = 100, scrollX = TRUE))
+  })
+  
+  
+  
+  #####################################################################
+  
+  # Usamos los lotes que ya vienen en tu objeto de formulario
+  lotes_del_sector <- reactive({
+    form_data <- datos_form_enfunde() # Esta es la reactiva que ya usas en tu renderUI
+    req(form_data$lotes)
+    return(form_data$lotes)
+  })
   
   
   
   
+  ###############################################
   
   
   
+  ################################################
   
   # --- 7. LÓGICA DE KPIS Y GRÁFICOS (CORREGIDA CON NUEVOS NOMBRES) ---
   
@@ -1284,11 +1721,105 @@ output$table_promedios_semana <- DT::renderDataTable({
       # Si tienes muchos lotes, ajusta la leyenda o usa facet_wrap si es necesario
       guides(color = guide_legend(ncol = 2)) 
   })
+
+  
+  
+  
+  
+  # Variable que guardará la pestaña
+  pestaña_activa <- reactiveVal("") # Empezamos en ingreso
+  
+  # Escuchamos el clic manual de JavaScript
+  observeEvent(input$tabsid_manual, {
+    pestaña_activa(input$tabsid_manual)
+  })
+  
+  
+  # Lógica: Si es Jefe de Sector y la pestaña es Ingreso, NO MOSTRAR
+ # if (u$role == "JEFE_SECTOR" && actual == "tab_enfunde_ingreso") {
+  #  return(NULL)
+  #}
+  
+  
+  
+  
+  output$contenedor_filtros_global <- renderUI({
+    u <- user_info()
+    req(u)
+    
+    actual <- pestaña_activa()
+    
+    # LÓGICA DE VISIBILIDAD MEJORADA
+    if (u$role == "JEFE_SECTOR") {
+      
+      
+      # BLOQUEO ESTRICTO: Solo si la variable dice 'tab_enfunde_ingreso'
+      # Como al iniciar la variable es "", esta condición NO se cumple y los filtros se muestran.
+      if (actual == "tab_enfunde_ingreso") {
+        return(NULL)
+      }
+    }
+      
+      
+      
+      
+      
+      
+      # Solo bloqueamos si estamos SEGUROS de que es la pestaña de ingreso.
+      # Si el valor es "" o NULL (instancia inicial), permitimos que se vean 
+      # para que no tengas que hacer clic para que 'aparezcan'.
+     # if (!is.null(actual) && actual == "tab_enfunde_ingreso") {
+    #    return(NULL)
+     # }
+   # }
+    
+    # Si es Admin o es Jefe en otra pestaña, mostrar:
+    fluidRow(
+      box(title = "Filtros de Exploración", status = "warning", solidHeader = TRUE, width = 12,
+          column(width = 12,
+                 column(width = 2, uiOutput("ui_filtro_empresa")),
+                 column(width = 2, uiOutput("ui_filtro_ano")),
+                 column(width = 2, uiOutput("ui_filtro_hacienda")),
+                 column(width = 2, uiOutput("ui_filtro_semana")),
+                 
+                 # El filtro de jefe solo para el Admin
+                 if (u$role == "ADMIN") {
+                   column(width = 2, uiOutput("ui_filtro_jesector"))
+                 }
+          )
+      )
+    )
+  })
+  
+  
+  
+  # Este bloque debe estar en tu Server
+  observeEvent(input$filtro_semana_consulta, {
+    # Solo disparamos si hay una semana seleccionada
+    req(input$filtro_semana_consulta, input$enfunde_hacienda)
+    
+    # Enviamos el mensaje al JavaScript que acabamos de modificar
+    session$sendCustomMessage('consultar_enfunde_semanal', list(
+      semana = input$filtro_semana_consulta,
+      hacienda = input$enfunde_hacienda
+    ))
+  })
+  
+  
+  # 2. Recibir los datos que JS nos devuelve
+  datos_reales_fb <- reactive({
+    # 'datos_desde_firestore' es lo que enviamos desde JS en el paso 1
+    res <- input$datos_desde_firestore
+    if (is.null(res) || length(res) == 0) return(NULL)
+    
+    # Convertimos la lista de JS a un DataFrame de R
+    df <- do.call(rbind, lapply(res, as.data.frame))
+    return(df)
+  })
   
   
   
   
   
   
-  
-}
+  }

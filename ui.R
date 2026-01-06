@@ -5,15 +5,26 @@ library(DT)
 
 # --- INCLUSIÓN DE DEPENDENCIAS JAVASCRIPT DE FIREBASE (CRÍTICO) ---
 # Solo necesitamos las librerías base, NO FirebaseUI
-firebase_dependencies <- tags$head(
-  tags$script(src = "https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"),
-  tags$script(src = "https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js")
-)
 
 # Definición de la interfaz
 ui <- fluidPage(
-  firebase_dependencies, 
-  shinyjs::useShinyjs(),
+ 
+  
+  
+  tags$head(
+    # 1. Firebase Core (app.js)
+    tags$script(src = "https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"),
+    # 2. Firebase AUTH (auth.js)
+    tags$script(src = "https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"),
+    # 3. Firebase FIRESTORE (firestore.js)
+    tags$script(src = "https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"),
+    
+    # 4. Inicializa el shinyjs (¡CRÍTICO!)
+    shinyjs::useShinyjs(),
+    
+    # (Cualquier otro CSS o tags$head que tengas)
+  ),
+ 
   
   # --- PANEL DE LOGIN MANUAL ---
   div(

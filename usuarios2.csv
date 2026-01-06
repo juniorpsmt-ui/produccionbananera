@@ -2,3 +2,6 @@ user;permissions;empresa_id;name;jefe_sector_asignado
 juniorpsmt@gmail.com;SUPER_ADMIN;ALL;Gerente Global;ALL
 ldominguez@sisbalam.com;JEFE_SECTOR;LAMIFORMI;Jefe de Sector;LUIS DOMINGUEZ
 operadorB@banano.com;OPERADOR_CADENA;EMP002;Op. Finca B;
+jzarauz@sisbalam.com;JEFE_SECTOR;LAMIFORMI;Jefe de Sector;JUAN ZARAUZ
+jlrosado@sisbalam.com;JEFE_SECTOR;LAMIFORMI;Jefe de Sector;JOSE LUIS ROSADO
+fsuarez@sisbalam.com;JEFE_SECTOR;LAMIFORMI;Jefe de Sector;FREDDY SUAREZ
