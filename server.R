@@ -178,7 +178,7 @@ server <- function(input, output, session) {
                 });
                 
                 // --- ALERTA DE PRUEBA ---
-                alert('Firestore respondió: Se encontraron ' + resultados.length + ' registros para la semana ' + params.semana);
+               // alert('Firestore respondió: Se encontraron ' + resultados.length + ' registros para la semana ' + params.semana);
                 
                 Shiny.setInputValue('datos_desde_firestore', JSON.stringify(resultados));
             })
