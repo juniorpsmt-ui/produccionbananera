@@ -323,7 +323,7 @@ server <- function(input, output, session) {
     req(nrow(data) > 0)
     
     # Debug: Se inicia la limpieza de datos
-    print("Iniciando limpieza y renombre de columnas en datos_dashboard")
+    #print("Iniciando limpieza y renombre de columnas en datos_dashboard")
     
     
         # *** CORRECCIÓN DE COLUMNAS Y PREPARACIÓN MÍNIMA ***
@@ -445,7 +445,7 @@ server <- function(input, output, session) {
   # --- 13. LÓGICA DE ENVÍO DE DATOS A FIREBASE ---
   observeEvent(input$enfunde_submit, {
     
-    print("¡Botón de Enfunde presionado en R!")
+   # print("¡Botón de Enfunde presionado en R!")
     
     user <- user_info()
     req(user$logged_in)
@@ -1009,10 +1009,10 @@ server <- function(input, output, session) {
   # --- En tu server.R (cerca de tus otros outputs/reactives) ---
   
   # 🚨 FUNCIÓN DE DEBUGGING TEMPORAL 🚨
-  output$debug_tab_id <- renderPrint({
+ # output$debug_tab_id <- renderPrint({
     # Imprime el valor de la pestaña activa (cuyo ID es "tabs" en el menú)
-    cat(paste("ID de Pestaña Activa (input$tabs):", input$tabs))
-  })
+   # cat(paste("ID de Pestaña Activa (input$tabs):", input$tabs))
+ # })
   
   
 
