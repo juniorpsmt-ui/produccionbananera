@@ -236,7 +236,7 @@ server <- function(input, output, session) {
     req(current_user_email) 
     
     # Debug: Se activa el RLS
-    print(paste("Usuario autenticado:", current_user_email))
+   # print(paste("Usuario autenticado:", current_user_email))
     
     
        user_data <- user_base %>%
@@ -287,7 +287,7 @@ server <- function(input, output, session) {
     req(nrow(datos_banano_raw) > 0)
     
     # Debug: Se activa la carga de datos
-    print(paste("Cargando datos para rol:", user$role))
+   # print(paste("Cargando datos para rol:", user$role))
     
     data <- datos_banano_raw
     
@@ -484,7 +484,7 @@ server <- function(input, output, session) {
     req(input$firebase_save_status)
 
     # 🚨 DEBUG CRÍTICO: Imprime el valor recibido directamente en la Consola de R
-    print(paste("Mensaje de Firebase recibido en R:", input$firebase_save_status))
+   # print(paste("Mensaje de Firebase recibido en R:", input$firebase_save_status))
     
         # Muestra el mensaje de éxito o error que regresa Firebase JS
     input$firebase_save_status
@@ -1413,7 +1413,7 @@ output$table_promedios_semana <- DT::renderDataTable({
       datos_lista <- tryCatch({
         jsonlite::fromJSON(datos_raw)
       }, error = function(e) {
-        print(paste("Error decodificando JSON:", e$message))
+      #  print(paste("Error decodificando JSON:", e$message))
         return(NULL)
       })
       
