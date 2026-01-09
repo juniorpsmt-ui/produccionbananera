@@ -10,6 +10,7 @@ library(readr) # Necesario para leer archivos CSV
 library(readxl) # Para leer el archivo Excel
 library(tibble) # Necesario para crear tibbles de emergencia
 library(data.table)
+library(lubridate)
 
 # Al inicio de tu archivo
 if (!require("data.table")) install.packages("data.table")
@@ -27,9 +28,9 @@ tryCatch({
   # Convertir a tibble/data.frame si la lógica subsiguiente de dplyr lo requiere
   datos_banano_raw <- as_tibble(datos_banano_raw) 
   
- # print(sapply(datos_banano_raw, class))
-
-      user_base <- read.csv("usuarios2.csv", sep = ";", stringsAsFactors = FALSE)
+  # print(sapply(datos_banano_raw, class))
+  
+  user_base <- read.csv("usuarios2.csv", sep = ";", stringsAsFactors = FALSE)
   
 }, error = function(e) {
   warning(paste("Error al cargar o procesar archivos:", e$message))
@@ -46,10 +47,10 @@ tryCatch({
 
 
 server <- function(input, output, session) {
- 
   
   
-   
+  
+  
   user_email_js <- reactiveVal(NULL)
   
   
@@ -82,7 +83,8 @@ server <- function(input, output, session) {
              return;
         }
 
-        globalFirebaseAuth.signInWithEmailAndPassword(data.email, data.password)
+
+ globalFirebaseAuth.signInWithEmailAndPassword(data.email, data.password)
             .catch(function(error) {
                 var message = error.message;
                 
@@ -102,26 +104,58 @@ server <- function(input, output, session) {
             });
     });
 
+   
+   
     // 2. Manejador de Guardado de Enfunde (Con chequeo de Firestore y try/catch agresivo)
-    Shiny.addCustomMessageHandler('save_enfunde_data', function(data) {
+    //Shiny.addCustomMessageHandler('save_enfunde_data', function(data) {
         // Usamos el try/catch para capturar cualquier error de ejecución inmediato (ej. Firestore no cargado).
+    //    try {
+      //      firebase.firestore().collection('enfunde_registros').add(data)
+        //        .then(function(docRef) {
+          //          Shiny.setInputValue('firebase_save_status', 'Registro de Enfunde exitoso. ID: ' + docRef.id, {priority: 'event'});
+            //    })
+              //  .catch(function(error) {
+                    // Fallo de Firestore/Reglas de Seguridad
+                //    console.error('Error de Firestore:', error.message);
+                  //  alert('ERROR (Consola F12): ' + error.message); // Muestra el error de las reglas
+                    //Shiny.setInputValue('firebase_save_status', 'Error al guardar en Firestore: ' + error.message, {priority: 'event'});
+              //  });
+      //  } catch (e) {
+            // Fallo de inicialización
+          //  alert('ERROR FATAL EN JS: ' + e.message);
+          //  Shiny.setInputValue('firebase_save_status', 'ERROR INTERNO: Fallo en la llamada a Firestore (' + e.message + ')', {priority: 'event'});
+    //   }
+ //   });
+    
+    
+    // otro manejador para guradr con id unicos
+    
+    // 2. Manejador de Guardado/Edición (Usando ID ÚNICO para evitar duplicados)
+    Shiny.addCustomMessageHandler('save_enfunde_data', function(data) {
         try {
-            firebase.firestore().collection('enfunde_registros').add(data)
-                .then(function(docRef) {
-                    Shiny.setInputValue('firebase_save_status', 'Registro de Enfunde exitoso. ID: ' + docRef.id, {priority: 'event'});
+            // Creamos un ID único combinando Hacienda, Semana y Lote
+          
+            
+            var idUnico = data.HACIENDA + '_' + data.SEMANA + '_' + data.LOTE;
+            
+            // Usamos .doc(idUnico).set(data) para que SOBREESCRIBA si ya existe
+            firebase.firestore().collection('enfunde_registros').doc(idUnico).set(data)
+                .then(function() {
+                    Shiny.setInputValue('firebase_save_status', 'Guardado exitoso: ' + idUnico, {priority: 'event'});
                 })
                 .catch(function(error) {
-                    // Fallo de Firestore/Reglas de Seguridad
                     console.error('Error de Firestore:', error.message);
-                    alert('ERROR (Consola F12): ' + error.message); // Muestra el error de las reglas
-                    Shiny.setInputValue('firebase_save_status', 'Error al guardar en Firestore: ' + error.message, {priority: 'event'});
+                    alert('ERROR: ' + error.message);
                 });
         } catch (e) {
-            // Fallo de inicialización
             alert('ERROR FATAL EN JS: ' + e.message);
-            Shiny.setInputValue('firebase_save_status', 'ERROR INTERNO: Fallo en la llamada a Firestore (' + e.message + ')', {priority: 'event'});
         }
     });
+    
+    
+    
+    
+    
 
     // 3. Manejador de Sign Out (Corregido para usar variable global)
     Shiny.addCustomMessageHandler('sign_out', function(message) { 
@@ -238,10 +272,10 @@ server <- function(input, output, session) {
     req(current_user_email) 
     
     # Debug: Se activa el RLS
-   # print(paste("Usuario autenticado:", current_user_email))
+    # print(paste("Usuario autenticado:", current_user_email))
     
     
-       user_data <- user_base %>%
+    user_data <- user_base %>%
       filter(user == current_user_email) %>%
       {
         if (nrow(.) == 0) {
@@ -274,7 +308,7 @@ server <- function(input, output, session) {
       jesector = tryCatch(user_data$jefe_sector_asignado[1], error = function(e) {"N/A"}) 
     )
   })
-
+  
   
   
   
@@ -289,7 +323,7 @@ server <- function(input, output, session) {
     req(nrow(datos_banano_raw) > 0)
     
     # Debug: Se activa la carga de datos
-   # print(paste("Cargando datos para rol:", user$role))
+    # print(paste("Cargando datos para rol:", user$role))
     
     data <- datos_banano_raw
     
@@ -314,7 +348,7 @@ server <- function(input, output, session) {
   
   
   
-  # --- 5B. Lógica de Mapeo y Preparación de Columnas (Estabilización) --- los llama los kpi que estan abajo aqui se preparan los datos 
+  # --- 5B. Lógica de Mapeo y Preparación de Columnas (Estabilización) --- los llama los kpi que estan abaui se preparan los datos 
   
   datos_dashboard <- reactive({
     
@@ -328,7 +362,7 @@ server <- function(input, output, session) {
     #print("Iniciando limpieza y renombre de columnas en datos_dashboard")
     
     
-        # *** CORRECCIÓN DE COLUMNAS Y PREPARACIÓN MÍNIMA ***
+    # *** CORRECCIÓN DE COLUMNAS Y PREPARACIÓN MÍNIMA ***
     data <- data %>%
       # 1. Renombramos las columnas con nombres problemáticos a nombres internos sin espacios
       rename(
@@ -356,7 +390,7 @@ server <- function(input, output, session) {
         Rechazado = as.character(Rechazado)
         
       ) %>%
-        
+      
       
       # 3. Seleccionamos solo las columnas críticas para la agrupación y cálculo
       select(
@@ -366,7 +400,7 @@ server <- function(input, output, session) {
         
         jesector,
         
-     
+        
         # Mantener otras columnas necesarias para los KPIs/Tablas existentes
         `Peso raquis`, Rechazado, Recuperado, `Numero de manos`, palanca, Defecto, `Generador de merma`, EdDi, `Tipo de plantacion`, TPId, MC
         # Mantener TASA_RECHAZO y RECUSADOS (si existen en el data.frame)
@@ -378,12 +412,12 @@ server <- function(input, output, session) {
     # ------------------------------------------------------------------
     
     # Solo aplicamos el filtro si el usuario tiene el rol JEFE_SECTOR
-     #  if (user$role == "JEFE_SECTOR") {
+    #  if (user$role == "JEFE_SECTOR") {
     #  data <- data %>%
-        # Filtramos la columna renombrada ('Jefe_Sector') 
-        # usando el valor capturado en user_info() ('user$jesector')
+    # Filtramos la columna renombrada ('Jefe_Sector') 
+    # usando el valor capturado en user_info() ('user$jesector')
     #    dplyr::filter(Jefe_Sector == user$jesector)
-  #  }
+    #  }
     
     # Asumo que el filtro por EMPRESA_ID_FILTRO ya lo tienes implementado en este punto si aplica.
     
@@ -447,10 +481,41 @@ server <- function(input, output, session) {
   # --- 13. LÓGICA DE ENVÍO DE DATOS A FIREBASE ---
   observeEvent(input$enfunde_submit, {
     
-   # print("¡Botón de Enfunde presionado en R!")
+    
+    
+    # 1. VALIDACIÓN PREVIA
+    total_dias <- as.numeric(enfunde_total())
+    lote_valor <- trimws(input$enfunde_lote) # trimws quita espacios en blanco
+    
+    if (lote_valor == "" || lote_valor == "0" || total_dias <= 0) {
+      showNotification(
+        "Error: Debe ingresar un número de Lote y al menos un valor en los días.", 
+        type = "error", 
+        duration = 5
+      )
+      return() # Esto detiene la ejecución aquí y NO guarda nada
+    }# 1. VALIDACIÓN PREVIA
+    total_dias <- as.numeric(enfunde_total())
+    lote_valor <- trimws(input$enfunde_lote) # trimws quita espacios en blanco
+    
+    if (lote_valor == "" || lote_valor == "0" || total_dias <= 0) {
+      showNotification(
+        "Error: Debe ingresar un número de Lote y al menos un valor en los días.", 
+        type = "error", 
+        duration = 5
+      )
+      return() # Esto detiene la ejecución aquí y NO guarda nada
+    }
+    
+    # print("¡Botón de Enfunde presionado en R!")
     
     user <- user_info()
     req(user$logged_in)
+    
+    # 1. Capturamos los datos EXACTOS del formulario
+    sem_actual <- as.numeric(input$enfunde_semana)
+    # Importante: El JS espera 'hacienda' como string
+    hacienda_actual <- as.character(input$enfunde_hacienda)
     
     # 1. Crear el objeto de datos que coincide con la estructura
     data_to_save <- list(
@@ -479,16 +544,56 @@ server <- function(input, output, session) {
     
     # 2. Enviar el objeto de datos al manejador JS de Firebase (Paso 2)
     session$sendCustomMessage(type = 'save_enfunde_data', message = data_to_save)
-  })
+    
+    
+    # 4. ACTUALIZACIÓN AUTOMÁTICA
+    # Tu JS espera un objeto con: {semana: ..., hacienda: ...} 
+    shinyjs::delay(1000, {
+      session$sendCustomMessage(type = 'consultar_enfunde_semanal', 
+                                message = list(
+                                  semana = sem_actual, 
+                                  hacienda = hacienda_actual
+                                ))
+    })
+    
+    
+    
+
+    updateSelectInput(session, "filtro_semana_consulta", selected = sem_actual)
+    
+    
+    # --- LIMPIEZA DE CAMPOS DESPUÉS DE GUARDAR ---
+    # Reseteamos los días a 0
+    updateNumericInput(session, "enfunde_lun", value = 0)
+    updateNumericInput(session, "enfunde_mar", value = 0)
+    updateNumericInput(session, "enfunde_mie", value = 0)
+    updateNumericInput(session, "enfunde_jue", value = 0)
+    updateNumericInput(session, "enfunde_vie", value = 0)
+    updateNumericInput(session, "enfunde_sab", value = 0)
+    updateNumericInput(session, "enfunde_dom", value = 0)
+    
+    # También podemos resetear el lote o dejarlo para el siguiente
+    updateTextInput(session, "enfunde_lote", value = "")
+    
+    # Notificación de éxito para estar seguros
+    showNotification("Registro guardado con éxito", type = "message", duration = 3)
+   
+ 
+      } )
+  
+  
+  ######################################
+  
+  
   
   # --- 14. Mostrar el estado de guardado de Firebase ---
   output$save_status_message <- renderText({
     req(input$firebase_save_status)
-
-    # 🚨 DEBUG CRÍTICO: Imprime el valor recibido directamente en la Consola de R
-   # print(paste("Mensaje de Firebase recibido en R:", input$firebase_save_status))
     
-        # Muestra el mensaje de éxito o error que regresa Firebase JS
+    # 🚨 DEBUG CRÍTICO: Imprime el valor recibido directamente en la Consola de R
+    # print(paste("Mensaje de Firebase recibido en R:", input$firebase_save_status))
+    
+    # Muestra el mensaje de éxito o error que regresa Firebase JS
     input$firebase_save_status
   })
   
@@ -528,7 +633,7 @@ server <- function(input, output, session) {
     if (!is.null(input$filtro_semana) && input$filtro_semana != "Todos") {
       data <- data %>% filter(SEMANA_COSECHA == input$filtro_semana)
     }
-
+    
     # 4. FILTRO POR JEFE DE SECTOR (Nuevo Filtro)
     # Solo aplicamos este filtro si el usuario tiene permiso para elegir
     if (!is.null(input$filtro_jesector) && input$filtro_jesector != "Todos") {
@@ -539,7 +644,7 @@ server <- function(input, output, session) {
     # ya ha aplicado un filtro permanente (user$name), por lo que el filtro de la UI
     # no afectará a ese usuario, lo cual es correcto.
     
-        
+    
     return(data)
   })
   
@@ -572,7 +677,7 @@ server <- function(input, output, session) {
         # Nota: Asumo que el valor de rechazo es 'Si' basado en el contexto. Si es 'S', 
         # debes cambiar 'Si' por 'S'.
         R_recusados = sum(toupper(Rechazado) != 'NO', na.rm = TRUE),
-    
+        
         
         
         Total_Racimos = n(),
@@ -587,8 +692,8 @@ server <- function(input, output, session) {
         .groups = 'drop'
       ) %>%
       arrange(as.numeric(LOTE_ID)) %>%
-    
-    # *** NUEVO PASO: OCULTAR EMPRESA y HACIENDA ***
+      
+      # *** NUEVO PASO: OCULTAR EMPRESA y HACIENDA ***
       # SELECCIÓN Y ORDEN DE COLUMNAS PARA LA TABLA
       select(
         LOTE_ID = LOTE_ID,
@@ -650,7 +755,7 @@ server <- function(input, output, session) {
         SEMANA_COSECHA, # <<< CAMBIO CLAVE: Columna de Semana
         # Hectareas, # Opcional: la quitamos por ser irrelevante en este resumen
         
-  
+        
         
         # Usamos saltos de línea en lugar de truncar
         `Peso Bruto<br>Promedio` = Peso_Bruto_Promedio,
@@ -665,7 +770,7 @@ server <- function(input, output, session) {
         
         
         
-       
+        
       )
   })
   
@@ -712,7 +817,7 @@ server <- function(input, output, session) {
   
   
   
-
+  
   
   
   
@@ -721,7 +826,7 @@ server <- function(input, output, session) {
   output$sidebar_menu <- renderUI({
     
     
- 
+    
     
     
     user <- user_info()
@@ -732,7 +837,7 @@ server <- function(input, output, session) {
     
     
     
- 
+    
     
     
     
@@ -750,7 +855,7 @@ server <- function(input, output, session) {
           
           
           id ="tabsid",
-         selected = "tab_enfunde_ingreso",  
+          selected = "tab_enfunde_ingreso",  
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
           menuItem("📊 Reporte Administrativo General por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
           # *** NUEVA PESTAÑA 2: REPORTE POR SEMANA ***
@@ -775,7 +880,7 @@ server <- function(input, output, session) {
       ),
       
       
-    
+      
       
       dashboardBody(
         tags$script(HTML("
@@ -786,13 +891,13 @@ server <- function(input, output, session) {
   ")),
         ###############################################################################
         shinyjs::useShinyjs(),
-
+        
         
         # *** ESTILOS CSS PARA COMPACTAR LA UI ***
         tags$head(
           
-
-  
+          
+          
           tags$style(HTML("
           /* Bloqueo total al cargar la página */
    /* .bloqueado-inicial { display: none !important; }   */
@@ -841,30 +946,30 @@ server <- function(input, output, session) {
         # ******************************************************
         # *** FIN DE LA INYECCIÓN DE CSS ***
         # ********************
-       
+        
         
         h6(paste("Bienvenido,", user$name, " (Rol:", user$role, ")"), icon("hand-peace")),
-
-      
-       uiOutput("contenedor_filtros_global"),
-       
+        
+        
+        uiOutput("contenedor_filtros_global"),
+        
         
         # ******************************************************
         # *** SOLUCIÓN: FILTROS GLOBALES (Fuera de tabItems) ***
         # ******************************************************
-     
-  
-       
         
-                tabItems(
-
+        
+        
+        
+        tabItems(
           
-                    # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
+          
+          # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
           # 1. Pestaña de Reporte Administrativo
           tabItem(tabName = "tab_reporte_admin",
                   h2("Reporte Administrativo: Parámetros de Producción por Lotes"),
                   
-                
+                  
                   
                   # *** KPIS (Reutilizan los filtros globales)
                   # KPIS para LOTES (Mantienen los IDs originales)
@@ -880,7 +985,7 @@ server <- function(input, output, session) {
                   fluidRow(
                     box(title = "Promedios de Producción por Lotes", status = "primary", solidHeader = TRUE, width = 12,
                         DT::dataTableOutput("table_promedios"))
-                    )             
+                  )             
           ),
           
           
@@ -889,8 +994,8 @@ server <- function(input, output, session) {
           tabItem(tabName = "tab_reporte_admin_semana",
                   h2("Reporte Administrativo: Parámetros de Producción por Semana"),
                   
-                 
-                 
+                  
+                  
                   
                   # *** KPIS (Reutilizan los filtros globales)
                   # KPIS para LOTES (Mantienen los IDs originales)
@@ -961,7 +1066,7 @@ server <- function(input, output, session) {
                   uiOutput("ui_enfunde_form") 
           ),
           
-     
+          
           
           # 🌟 NUEVO TABITEM: Análisis de Enfunde (Vacío por ahora)
           tabItem(tabName = "tab_enfunde_analisis",
@@ -971,7 +1076,7 @@ server <- function(input, output, session) {
           
           
           
-                     # 2. Pestaña de Tasa de Rechazo (El tabItem original)
+          # 2. Pestaña de Tasa de Rechazo (El tabItem original)
           tabItem(tabName = "tab_rechazo",
                   h2("Análisis de Pérdidas y Recusados"),
                   fluidRow(
@@ -1005,239 +1110,270 @@ server <- function(input, output, session) {
           )
         )
       )
-      )
+    )
   })
   
   # --- En tu server.R (cerca de tus otros outputs/reactives) ---
   
   # 🚨 FUNCIÓN DE DEBUGGING TEMPORAL 🚨
- # output$debug_tab_id <- renderPrint({
-    # Imprime el valor de la pestaña activa (cuyo ID es "tabs" en el menú)
-   # cat(paste("ID de Pestaña Activa (input$tabs):", input$tabs))
- # })
+  # output$debug_tab_id <- renderPrint({
+  # Imprime el valor de la pestaña activa (cuyo ID es "tabs" en el menú)
+  # cat(paste("ID de Pestaña Activa (input$tabs):", input$tabs))
+  # })
   
   
-
+  
   
   # --- 9. RENDERIZACIÓN DE LA TABLA DEL REPORTE ADMINISTRATIVO ---
-output$table_promedios <- DT::renderDataTable({
-  data <- reporte_promedios()
-  req(nrow(data) > 0)
-  
-  DT::datatable(
-    data, 
-    escape = FALSE,
-    # *** CAMBIO APLICADO: Añadir la clase 'cell-border' ***
-    class = 'cell-border stripe',
-    
-    # *** CAMBIO 1: Habilitar la extensión de Botones ***
-    extensions = 'Buttons',
-    
-    options = list(pageLength = 50, scrollX = TRUE, 
-                   lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
-    
-                   # *** CAMBIO 2: Definir la estructura (dom) e incluir los botones (B) ***
-                   dom = 'lBfrtip', # 'B' incluye los botones, 'f' el filtro, 'r' loading, 't' tabla, 'i' info, 'p' paginación
-                   buttons = list(
-                     'copy', # Opción de copiar (Copy)
-                     list(extend = 'csv', filename = 'Reporte_Administrativo'),
-                     list(extend = 'excel', filename = 'Reporte_Administrativo', title = 'Reporte Administrativo por Lotes'),
-                     
-                     list(
-                       extend = 'pdf', 
-                       title = 'Reporte Administrativo por Lotes',
-                       # 1. Orientación horizontal
-                       orientation = 'landscape', 
-                       # 2. Configuración de página (Ajuste de tamaño)
-                       pageSize = 'A4'
-                     )
-           
-         )
-    ),
-    
-    rownames = FALSE
-  ) %>%
-    # --- 1. FORMATOS DE REDONDEO ---
-    formatRound(columns = 'Peso Bruto<br>Promedio', digits = 2) %>%
-    formatRound(columns = 'Calibracion<br>Promedio', digits = 1) %>%
-    formatRound(columns = 'Núm. Manos<br>Promedio', digits = 1) %>%
-    formatRound(columns = 'Edad<br>Promedio', digits =1) %>%
-    formatRound(columns = 'Hectareas', digits = 2) %>% # Formato para Hectáreas
-    
-    # *** NUEVO FORMATO: R.recusados (Conteo) ***
-    formatRound(columns =  'Racimos<br>Recusados' , digits = 0) %>%
-    
-    # *** NUEVO FORMATO: R_procesados (Conteo entero) ***
-    formatRound(columns ='Racimos<br>Procesados', digits = 0) %>%
-    
-    
-    # --- 2. SEMAFORIZACIÓN De los paramtetros de produccion
-    
-    # --- 2. SEMAFORIZACIÓN DEL PESO BRUTO (Peso_Bruto_Promedio) ---
-    formatStyle(
-      'Peso Bruto<br>Promedio',
-      backgroundColor = styleInterval(
-        c(45, 60), # Puntos de corte: <40 es 1, 40-50 es 2, >50 es 3
-        c('red', 'yellow', 'lightgreen') # Colores: Rojo (bajo), Amarillo (advertencia), Verde (óptimo)
-      )
-    ) %>%
-    
-    # --- 3. SEMAFORIZACIÓN DE CALIBRACIÓN (Calibracion_Promedio) ---
-    # Rango óptimo (Verde): 43.0 a 44.0
-    # Rango de Advertencia (Amarillo): 42.0 a <43.0 Y >44.0 a 45.0
-    # Rango Crítico (Rojo): <42.0 O >45.0
-    
-    formatStyle(
-      'Calibracion<br>Promedio',
-      # Definimos los 5 rangos con 4 puntos de corte: 42, 43, 44, 45
-      backgroundColor = styleInterval(
-        c(42, 43.5, 45, 45.5),
-        c('red',    # < 42.0 (Crítico)
-          'yellow',  # 42.0 a <43.0 (Advertencia)
-          'lightgreen',# 43.5 a <45 (Óptimo)
-          'yellow',  # 44.0 a <45.0 (Advertencia)
-          'red')      # > 45.0 (Crítico)
-      )
-    ) %>%
-    
- 
-    
-    # --- 4. SEMAFORIZACIÓN DE NÚMERO DE MANOS (Num_Manos_Promedio) ---
-    
- 
-    formatStyle(
-      'Núm. Manos<br>Promedio',
-      backgroundColor = styleInterval(
-        c(7, 8), # Puntos de corte: <7, 7-8, >8
-        c('red', 'yellow', 'lightgreen')
-      )
-    ) %>%
-    
-    # --- 5. SEMAFORIZACIÓN DE EDAD (Lógica simplificada y corregida) ---
-    # Rango óptimo 11-13 semanas. Todo lo que esté fuera es amarillo o rojo.
-    # Lógica: <10 (Rojo), 10-14 (Amarillo/Verde), >14 (Rojo)
-    formatStyle(
-      'Edad<br>Promedio',
-      # 1. Rojo para los extremos: <10 o >14
-      backgroundColor = styleInterval(
-        c(10, 14), 
-        c('red', 'yellow', 'red')
-      )
-    ) %>%
-    formatStyle(
-      'Edad<br>Promedio',
-      # 2. Sobrescribir con Verde solo el rango óptimo (11, 12, 13)
-      backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
-    )
-  
-})
-  
-
-
-
-  
-
-# --- 10. RENDERIZACIÓN DE LA TABLA DEL REPORTE ADMINISTRATIVO POR SEMANA ---
-output$table_promedios_semana <- DT::renderDataTable({
-  # *** CAMBIO CLAVE: Usamos la nueva función de resumen por semana ***
-  data <- reporte_promedios_semana()
-  req(nrow(data) > 0)
-  
-  DT::datatable(
-    data,
-    escape = FALSE,
-    class = 'cell-border stripe',
-    extensions = 'Buttons',
-    
-    options = list(
-      pageLength = 50,
-      scrollX = TRUE,
-      lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
-      dom = 'lBfrtip',
-      buttons = list(
-        'copy', 
-        list(extend = 'csv', filename = 'Reporte_Administrativo_Semana'),
-        list(extend = 'excel', filename = 'Reporte_Administrativo_Semana', title = 'Reporte Administrativo por Semana'),
-        list(extend = 'pdf', title = 'Reporte Administrativo por Semana')
-      )
-    ),
-    
-    rownames = FALSE
-  ) %>%
-    # --- FORMATOS DE REDONDEO ---
-    formatRound(columns = 'Peso Bruto<br>Promedio', digits = 2) %>%
-    formatRound(columns = 'Calibracion<br>Promedio', digits = 1) %>%
-    formatRound(columns = 'Núm. Manos<br>Promedio', digits = 1) %>%
-    formatRound(columns = 'Edad<br>Promedio', digits = 1) %>%
-  #  formatRound(columns = 'TASA_RECHAZO', digits = 2) %>%
-    formatRound(columns = 'Racimos<br>Recusados' , digits = 0) %>%
-    formatRound(columns ='Racimos<br>Procesados', digits = 0) %>%
-    
-    # *** SEMAFORIZACIÓN (Se aplica la misma lógica de Lotes) ***
-    formatStyle(
-      'Peso Bruto<br>Promedio',
-      backgroundColor = styleInterval(
-        c(45, 60),
-        c('red', 'yellow', 'lightgreen') 
-      )
-    ) %>%
-    formatStyle(
-      'Calibracion<br>Promedio',
-      backgroundColor = styleInterval(
-        c(42, 43.5, 45, 45.5),
-        c('red', 'yellow', 'lightgreen', 'yellow', 'red')
-      )
-    ) %>%
-    formatStyle(
-      'Núm. Manos<br>Promedio',
-      backgroundColor = styleInterval(
-        c(7, 8),
-        c('red', 'yellow', 'lightgreen')
-      )
-    ) %>%
-    formatStyle(
-      'Edad<br>Promedio',
-      backgroundColor = styleInterval(
-        c(10, 14),
-        c('red', 'yellow', 'red')
-      )
-    ) %>%
-    formatStyle(
-      'Edad<br>Promedio',
-      backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
-    )
-})
-
-
-
-
-
-
-  
-  
-  # --- LÓGICA PARA GENERAR EL FILTRO DE SEMANAS (Añadir a Server.R) ---
-  output$ui_filtro_semana <- renderUI({
-    data <- datos_dashboard()
+  output$table_promedios <- DT::renderDataTable({
+    data <- reporte_promedios()
     req(nrow(data) > 0)
     
-    # Obtener todas las semanas únicas y ordenarlas
-    semanas <- unique(data$SEMANA_COSECHA)
-    semanas <- sort(semanas)
+    DT::datatable(
+      data, 
+      escape = FALSE,
+      # *** CAMBIO APLICADO: Añadir la clase 'cell-border' ***
+      class = 'cell-border stripe',
+      
+      # *** CAMBIO 1: Habilitar la extensión de Botones ***
+      extensions = 'Buttons',
+      
+      options = list(pageLength = 50, scrollX = TRUE, 
+                     lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
+                     
+                     # *** CAMBIO 2: Definir la estructura (dom) e incluir los botones (B) ***
+                     dom = 'lBfrtip', # 'B' incluye los botones, 'f' el filtro, 'r' loading, 't' tabla, 'i' info, 'p' paginación
+                     buttons = list(
+                       'copy', # Opción de copiar (Copy)
+                       list(extend = 'csv', filename = 'Reporte_Administrativo'),
+                       list(extend = 'excel', filename = 'Reporte_Administrativo', title = 'Reporte Administrativo por Lotes'),
+                       
+                       list(
+                         extend = 'pdf', 
+                         title = 'Reporte Administrativo por Lotes',
+                         # 1. Orientación horizontal
+                         orientation = 'landscape', 
+                         # 2. Configuración de página (Ajuste de tamaño)
+                         pageSize = 'A4'
+                       )
+                       
+                     )
+      ),
+      
+      rownames = FALSE
+    ) %>%
+      # --- 1. FORMATOS DE REDONDEO ---
+      formatRound(columns = 'Peso Bruto<br>Promedio', digits = 2) %>%
+      formatRound(columns = 'Calibracion<br>Promedio', digits = 1) %>%
+      formatRound(columns = 'Núm. Manos<br>Promedio', digits = 1) %>%
+      formatRound(columns = 'Edad<br>Promedio', digits =1) %>%
+      formatRound(columns = 'Hectareas', digits = 2) %>% # Formato para Hectáreas
+      
+      # *** NUEVO FORMATO: R.recusados (Conteo) ***
+      formatRound(columns =  'Racimos<br>Recusados' , digits = 0) %>%
+      
+      # *** NUEVO FORMATO: R_procesados (Conteo entero) ***
+      formatRound(columns ='Racimos<br>Procesados', digits = 0) %>%
+      
+      
+      # --- 2. SEMAFORIZACIÓN De los paramtetros de produccion
+      
+      # --- 2. SEMAFORIZACIÓN DEL PESO BRUTO (Peso_Bruto_Promedio) ---
+      formatStyle(
+        'Peso Bruto<br>Promedio',
+        backgroundColor = styleInterval(
+          c(45, 60), # Puntos de corte: <40 es 1, 40-50 es 2, >50 es 3
+          c('red', 'yellow', 'lightgreen') # Colores: Rojo (bajo), Amarillo (advertencia), Verde (óptimo)
+        )
+      ) %>%
+      
+      # --- 3. SEMAFORIZACIÓN DE CALIBRACIÓN (Calibracion_Promedio) ---
+      # Rango óptimo (Verde): 43.0 a 44.0
+      # Rango de Advertencia (Amarillo): 42.0 a <43.0 Y >44.0 a 45.0
+      # Rango Crítico (Rojo): <42.0 O >45.0
+      
+      formatStyle(
+        'Calibracion<br>Promedio',
+        # Definimos los 5 rangos con 4 puntos de corte: 42, 43, 44, 45
+        backgroundColor = styleInterval(
+          c(42, 43.5, 45, 45.5),
+          c('red',    # < 42.0 (Crítico)
+            'yellow',  # 42.0 a <43.0 (Advertencia)
+            'lightgreen',# 43.5 a <45 (Óptimo)
+            'yellow',  # 44.0 a <45.0 (Advertencia)
+            'red')      # > 45.0 (Crítico)
+        )
+      ) %>%
+      
+      
+      
+      # --- 4. SEMAFORIZACIÓN DE NÚMERO DE MANOS (Num_Manos_Promedio) ---
+      
+      
+      formatStyle(
+        'Núm. Manos<br>Promedio',
+        backgroundColor = styleInterval(
+          c(7, 8), # Puntos de corte: <7, 7-8, >8
+          c('red', 'yellow', 'lightgreen')
+        )
+      ) %>%
+      
+      # --- 5. SEMAFORIZACIÓN DE EDAD (Lógica simplificada y corregida) ---
+      # Rango óptimo 11-13 semanas. Todo lo que esté fuera es amarillo o rojo.
+      # Lógica: <10 (Rojo), 10-14 (Amarillo/Verde), >14 (Rojo)
+      formatStyle(
+        'Edad<br>Promedio',
+        # 1. Rojo para los extremos: <10 o >14
+        backgroundColor = styleInterval(
+          c(10, 14), 
+          c('red', 'yellow', 'red')
+        )
+      ) %>%
+      formatStyle(
+        'Edad<br>Promedio',
+        # 2. Sobrescribir con Verde solo el rango óptimo (11, 12, 13)
+        backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
+      )
+    
+  })
+  
+  
+  
+  
+  
+  
+  # --- 10. RENDERIZACIÓN DE LA TABLA DEL REPORTE ADMINISTRATIVO POR SEMANA ---
+  output$table_promedios_semana <- DT::renderDataTable({
+    # *** CAMBIO CLAVE: Usamos la nueva función de resumen por semana ***
+    data <- reporte_promedios_semana()
+    req(nrow(data) > 0)
+    
+    DT::datatable(
+      data,
+      escape = FALSE,
+      class = 'cell-border stripe',
+      extensions = 'Buttons',
+      
+      options = list(
+        pageLength = 50,
+        scrollX = TRUE,
+        lengthMenu = list(c(10, 25, 50, 100, -1), c('10', '25', '50', '100', 'Todas las filas')),
+        dom = 'lBfrtip',
+        buttons = list(
+          'copy', 
+          list(extend = 'csv', filename = 'Reporte_Administrativo_Semana'),
+          list(extend = 'excel', filename = 'Reporte_Administrativo_Semana', title = 'Reporte Administrativo por Semana'),
+          list(extend = 'pdf', title = 'Reporte Administrativo por Semana')
+        )
+      ),
+      
+      rownames = FALSE
+    ) %>%
+      # --- FORMATOS DE REDONDEO ---
+      formatRound(columns = 'Peso Bruto<br>Promedio', digits = 2) %>%
+      formatRound(columns = 'Calibracion<br>Promedio', digits = 1) %>%
+      formatRound(columns = 'Núm. Manos<br>Promedio', digits = 1) %>%
+      formatRound(columns = 'Edad<br>Promedio', digits = 1) %>%
+      #  formatRound(columns = 'TASA_RECHAZO', digits = 2) %>%
+      formatRound(columns = 'Racimos<br>Recusados' , digits = 0) %>%
+      formatRound(columns ='Racimos<br>Procesados', digits = 0) %>%
+      
+      # *** SEMAFORIZACIÓN (Se aplica la misma lógica de Lotes) ***
+      formatStyle(
+        'Peso Bruto<br>Promedio',
+        backgroundColor = styleInterval(
+          c(45, 60),
+          c('red', 'yellow', 'lightgreen') 
+        )
+      ) %>%
+      formatStyle(
+        'Calibracion<br>Promedio',
+        backgroundColor = styleInterval(
+          c(42, 43.5, 45, 45.5),
+          c('red', 'yellow', 'lightgreen', 'yellow', 'red')
+        )
+      ) %>%
+      formatStyle(
+        'Núm. Manos<br>Promedio',
+        backgroundColor = styleInterval(
+          c(7, 8),
+          c('red', 'yellow', 'lightgreen')
+        )
+      ) %>%
+      formatStyle(
+        'Edad<br>Promedio',
+        backgroundColor = styleInterval(
+          c(10, 14),
+          c('red', 'yellow', 'red')
+        )
+      ) %>%
+      formatStyle(
+        'Edad<br>Promedio',
+        backgroundColor = styleEqual(c(11, 12, 13), rep('lightgreen', 3))
+      )
+  })
+  
+  
+  
+  
+  
+  
+  
+  # 
+  # # --- LÓGICA PARA GENERAR EL FILTRO DE SEMANAS (Añadir a Server.R) ---
+  # output$ui_filtro_semana <- renderUI({
+  #   data <- datos_dashboard()
+  #   req(nrow(data) > 0)
+  #   
+  #   # Obtener todas las semanas únicas y ordenarlas
+  #   semanas <- unique(data$SEMANA_COSECHA)
+  #   semanas <- sort(semanas)
+  #   
+  #   # Opciones, incluyendo 'Todos'
+  #   opciones <- c("Todos", semanas)
+  #   
+  #   # Generar el control de selección
+  #   selectInput(
+  #     "filtro_semana", 
+  #     "Filtrar por Semana:", 
+  #     choices = opciones,
+  #     selected = "Todos"
+  #   )
+  # })
+  
+  ##################################
+  
+  # --- LÓGICA PARA GENERAR EL FILTRO DE SEMANAS (MODIFICADO) ---
+  output$ui_filtro_semana <- renderUI({
+    # 1. Intentar obtener semanas del archivo Excel
+    data <- datos_dashboard()
+    
+    # 2. Determinar el límite según el año seleccionado
+    # Usamos input$filtro_ano (asegúrate que este sea el ID de tu selector de año)
+    req(input$filtro_ano)
+    limite_semanas <- if (input$filtro_ano == 2026) 53 else 52
+    
+    if (!is.null(data) && nrow(data) > 0) {
+      # Si hay datos en el Excel, extraemos esas semanas
+      semanas_archivo <- unique(data$SEMANA_COSECHA)
+      # Solo nos quedamos con las que no superen el límite legal del año
+      semanas <- sort(semanas_archivo[semanas_archivo <= limite_semanas])
+    } else {
+      # Si el archivo falla, generamos la lista manual del 1 al límite
+      semanas <- 1:limite_semanas
+    }
     
     # Opciones, incluyendo 'Todos'
     opciones <- c("Todos", semanas)
     
     # Generar el control de selección
     selectInput(
-      "filtro_semana", 
+      "filtro_semana_consulta", # ID que usa tu lógica de Firebase
       "Filtrar por Semana:", 
       choices = opciones,
       selected = "Todos"
     )
   })
-  
-  
-  
   
   
   
@@ -1278,7 +1414,7 @@ output$table_promedios_semana <- DT::renderDataTable({
   
   
   # --- LÓGICA PARA GENERAR EL FILTRO DE EMPRESAS (Solo si el usuario es SUPER_ADMIN) ---
- 
+  
   
   # --- LÓGICA PARA GENERAR EL FILTRO DE EMPRESAS (Solo si el usuario es SUPER_ADMIN) ---
   output$ui_filtro_empresa <- renderUI({
@@ -1343,8 +1479,9 @@ output$table_promedios_semana <- DT::renderDataTable({
       # PRIMER BLOQUE: FORMULARIO
       fluidRow(
         box(title = "Datos de Ubicación y Fecha", status = "primary", solidHeader = TRUE, width = 4,
-            dateInput("enfunde_fecha", "Fecha de Enfunde", value = Sys.Date()),
-            numericInput("enfunde_semana", "Semana", value = as.numeric(format(Sys.Date(), "%W"))),
+            dateInput("enfunde_fecha", "Fecha de Registro", value = Sys.Date()),
+            #numericInput("enfunde_semana", "Semana", value = as.numeric(format(Sys.Date(), "%W"))),
+            selectInput("enfunde_semana", "Semana:", choices = 1:52, selected = 2),
             selectInput("enfunde_hacienda", "Hacienda (RLS)", choices = form_data$haciendas),
             selectInput("enfunde_lote", "Lote (RLS)", choices = form_data$lotes),
             selectInput("enfunde_cinta", "Color de Cinta", choices = form_data$cintas)
@@ -1380,8 +1517,9 @@ output$table_promedios_semana <- DT::renderDataTable({
           width = 12,
           column(width = 12,
                  div(style = "display: inline-block; vertical-align:top; width: 250px;",
-                     numericInput("filtro_semana_consulta", "Ver Historial (Semana):", 
-                                  value = as.numeric(format(Sys.Date(), "%W")), min = 1, max = 53)),
+                     selectInput("filtro_semana_consulta", "Ver Historial (Semana):",
+                                 choices = 1:52, # Esto se actualizará solo
+                                 selected = 2)),
                  hr(),
                  # Contenedor para la tabla
                  DT::dataTableOutput("tabla_ingresos_semanales")
@@ -1392,15 +1530,95 @@ output$table_promedios_semana <- DT::renderDataTable({
   })
   
   
-  ##########################################################################################
+  ###########################################
   
-  output$tabla_ingresos_semanales <- DT::renderDataTable({
+  
+  
+  
+  # --- 11. RECEPTOR DE DATOS DESDE FIREBASE ---
+  datos_semanales_firebase <- reactiveVal(NULL)
+  
+  valores_tabla_actual <- reactiveVal(NULL)
+  
+  
+  
+  observeEvent(input$datos_desde_firestore, {
+    req(input$datos_desde_firestore)
+    # Convertimos el texto JSON que envía JS a una tabla de R
+    df <- as.data.frame(jsonlite::fromJSON(input$datos_desde_firestore))
+    datos_semanales_firebase(df)
+  })
+  
+  
+  
+  ######################################
+  
+  
+  
+  # --- EVENTO 1: CUANDO CAMBIA LA FECHA ---
+  observeEvent(input$enfunde_fecha, {
+    req(input$enfunde_fecha)
+    
+    # Calculamos semana según estándar bananero (ISO)
+    sem_iso <- as.numeric(format(input$enfunde_fecha, "%V"))
+    anio_act <- as.numeric(format(input$enfunde_fecha, "%Y"))
+    
+    # Actualizamos el selector de ARRIBA
+    updateSelectInput(session, "enfunde_semana", selected = sem_iso)
+    
+    # Actualizamos el selector de ABAJO (Igualdad)
+    updateSelectInput(session, "filtro_semana_consulta", selected = sem_iso)
+    
+    # Consultamos a Firebase con esa semana
+    user <- user_info()
+    shinyjs::runjs(sprintf("consultar_enfunde_semanal('%s', '%s', %s);", 
+                           user$empresa_id, anio_act, sem_iso))
+  })
+  
+  
+  
+  
+  
+  ######################################
+  
+  
+  observeEvent(input$enfunde_semana, {
+    req(input$enfunde_semana)
+    
+    # 1. El valor ya es la semana, no necesitas format() ni cálculos
+    sem_elegida <- input$enfunde_semana
+    
+    # 2. Obtenemos el año actual del sistema o del input de fecha
+    anio_act <- format(input$enfunde_fecha, "%Y")
+    
+    # 3. IGUALAMOS el de abajo con el de arriba
+    # Solo cambiamos el valor seleccionado
+    updateSelectInput(session, "filtro_semana_consulta", 
+                      selected = sem_elegida)
+    
+    # 4. CONSULTA AUTOMÁTICA A FIREBASE
+    user <- user_info()
+    if (!is.null(user$logged_in) && user$logged_in) {
+      shinyjs::runjs(sprintf("consultar_enfunde_semanal('%s', '%s', %s);", 
+                             user$empresa_id, 
+                             anio_act, 
+                             sem_elegida))
+    }
+    
+  }, priority = 10)
+  
+  
+  
+  
+    ##########################################################################################
+  
+output$tabla_ingresos_semanales <- DT::renderDataTable({
     mis_lotes <- lotes_del_sector()
     req(mis_lotes)
     
     # 1. Crear tabla molde
     tabla_final <- data.frame(
-      Lote = as.character(trimws(as.character(mis_lotes))),
+      LOTE = as.character(trimws(as.character(mis_lotes))),
       LUNES = 0, MARTES = 0, MIERCOLES = 0, JUEVES = 0, 
       VIERNES = 0, SABADO = 0, DOMINGO = 0,
       stringsAsFactors = FALSE
@@ -1410,29 +1628,16 @@ output$table_promedios_semana <- DT::renderDataTable({
     datos_raw <- input$datos_desde_firestore
     
     if (!is.null(datos_raw) && datos_raw != "" && datos_raw != "[]") {
-      
-      # Intentar decodificar el JSON con manejo de errores
-      datos_lista <- tryCatch({
-        jsonlite::fromJSON(datos_raw)
-      }, error = function(e) {
-      #  print(paste("Error decodificando JSON:", e$message))
-        return(NULL)
-      })
+      datos_lista <- tryCatch({ jsonlite::fromJSON(datos_raw) }, error = function(e) { return(NULL) })
       
       if (!is.null(datos_lista)) {
-        # Convertir a dataframe y normalizar columnas a MAYÚSCULAS
         datos_reales <- as.data.frame(datos_lista)
         colnames(datos_reales) <- toupper(trimws(colnames(datos_reales)))
         
-        # 3. CRUCE DE DATOS (MATCH)
         if ("LOTE" %in% colnames(datos_reales)) {
           for(i in 1:nrow(datos_reales)) {
-            
-            # Limpieza del lote de la DB
             lote_db <- as.character(trimws(as.character(datos_reales$LOTE[i])))
-            
-            # Buscar en la tabla del Excel
-            fila_match <- which(tabla_final$Lote == lote_db)
+            fila_match <- which(tabla_final$LOTE == lote_db)
             
             if (length(fila_match) > 0) {
               dias <- c("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO")
@@ -1440,7 +1645,6 @@ output$table_promedios_semana <- DT::renderDataTable({
                 if(d %in% colnames(datos_reales)) {
                   valor <- as.numeric(as.character(datos_reales[i, d]))
                   if(!is.na(valor)) {
-                    # Sumar el valor (importante si hay varios registros)
                     tabla_final[fila_match, d] <- tabla_final[fila_match, d] + valor
                   }
                 }
@@ -1451,16 +1655,65 @@ output$table_promedios_semana <- DT::renderDataTable({
       }
     }
     
-    # 4. Totales y Renderizado
-    tabla_final$Total <- rowSums(tabla_final[, 2:8], na.rm = TRUE)
+    # 4. Totales Horizontales
+    tabla_final$TOTAL <- rowSums(tabla_final[, 2:8], na.rm = TRUE)
     
-    DT::datatable(tabla_final, rownames = FALSE, 
+    # --- BLOQUE DE TOTALES POR DÍA (FOOTER) ---
+    # Calculamos la suma de cada columna para el final
+    sumas_dias <- colSums(tabla_final[, 2:9], na.rm = TRUE)
+    
+    sketch = htmltools::withTags(table(
+      tableHeader(colnames(tabla_final)),
+      tableFooter(c("TOTAL GENERAL", sumas_dias))
+    ))
+    # ------------------------------------------
+    
+    # Guardamos para el clic
+    valores_tabla_actual(tabla_final)
+    
+    DT::datatable(tabla_final, 
+                  container = sketch,  # Aquí inyectamos la fila de totales
+                  rownames = FALSE, 
+                  selection = 'single',
                   options = list(dom = 't', pageLength = 100, scrollX = TRUE))
+    
+  }, server = TRUE)
+  
+  #####################################################################
+  # --- 12. CARGAR DATOS PARA EDICIÓN (CORREGIDO) ---
+  observeEvent(input$tabla_ingresos_semanales_rows_selected, {
+    
+    # 1. Traemos la "foto" de la tabla que guardamos en la sección 11
+    res <- valores_tabla_actual() 
+    req(res)
+    
+    # 2. Obtenemos el índice que el usuario tocó
+    idx <- input$tabla_ingresos_semanales_rows_selected
+    req(idx)
+    
+    # 3. Extraemos la fila con total seguridad
+    fila <- res[idx, ]
+    
+    # 4. Actualizamos los inputs arriba
+    updateTextInput(session, "enfunde_lote", value = as.character(fila$LOTE))
+    updateNumericInput(session, "enfunde_lun", value = as.numeric(fila$LUNES))
+    updateNumericInput(session, "enfunde_mar", value = as.numeric(fila$MARTES))
+    updateNumericInput(session, "enfunde_mie", value = as.numeric(fila$MIERCOLES))
+    updateNumericInput(session, "enfunde_jue", value = as.numeric(fila$JUEVES))
+    updateNumericInput(session, "enfunde_vie", value = as.numeric(fila$VIERNES))
+    updateNumericInput(session, "enfunde_sab", value = as.numeric(fila$SABADO))
+    updateNumericInput(session, "enfunde_dom", value = as.numeric(fila$DOMINGO))
+    
+    showNotification(paste("Editando Lote:", fila$LOTE), type = "message")
   })
   
   
   
-  #####################################################################
+  
+  
+  
+  
+  ###############################################
   
   # Usamos los lotes que ya vienen en tu objeto de formulario
   lotes_del_sector <- reactive({
@@ -1473,6 +1726,18 @@ output$table_promedios_semana <- DT::renderDataTable({
   
   
   ###############################################
+  
+  
+  
+  
+  
+  
+ 
+  
+  
+  
+  
+  
   
   
   
@@ -1501,13 +1766,13 @@ output$table_promedios_semana <- DT::renderDataTable({
   
   # # KPI 3: Tasa de Rechazo
   #output$kpi_tasa_rechazo <- renderValueBox({
-    # *** CAMBIO AQUÍ: Usamos la función con filtros ***
+  # *** CAMBIO AQUÍ: Usamos la función con filtros ***
   #  data <- datos_para_kpi_y_tabla() 
-   # req(nrow(data) > 0)
-    # Asumiendo que TASA_RECHAZO existe y es una proporción (Ej. 0.05 = 5%)
-    # Si la columna TASA_RECHAZO contiene valores absolutos de tasa (Ej. 5, 10, 2), usamos `mean`
+  # req(nrow(data) > 0)
+  # Asumiendo que TASA_RECHAZO existe y es una proporción (Ej. 0.05 = 5%)
+  # Si la columna TASA_RECHAZO contiene valores absolutos de tasa (Ej. 5, 10, 2), usamos `mean`
   #  tasa <- mean(data$TASA_RECHAZO, na.rm = TRUE)
-   # valueBox(value = paste(round(tasa, 1), "%"), subtitle = "Tasa de Rechazo Promedio", icon = icon("fire"), color = "red") 
+  # valueBox(value = paste(round(tasa, 1), "%"), subtitle = "Tasa de Rechazo Promedio", icon = icon("fire"), color = "red") 
   #})
   
   # --- KPI 4: Edad Promedio ---
@@ -1515,9 +1780,9 @@ output$table_promedios_semana <- DT::renderDataTable({
     # Usa la función con filtros para que el KPI reaccione a la selección del usuario
     data <- datos_para_kpi_y_tabla() 
     req(nrow(data) > 0)
-        # Calculamos la edad promedio
+    # Calculamos la edad promedio
     promedio <- mean(data$Edad, na.rm = TRUE) 
-        valueBox(
+    valueBox(
       value = paste(round(promedio, 1), ""), 
       subtitle = "Edad Promedio de Cosecha", 
       icon = icon("leaf"), 
@@ -1599,15 +1864,15 @@ output$table_promedios_semana <- DT::renderDataTable({
   })
   
   # Gráfico: Tasa de Rechazo por Lote
- # output$plot_tasa_rechazo <- renderPlot({
- #   data <- datos_dashboard()
- #   req(nrow(data) > 0)
-    # ¡CORREGIDO! Usando LOTE_ID
+  # output$plot_tasa_rechazo <- renderPlot({
+  #   data <- datos_dashboard()
+  #   req(nrow(data) > 0)
+  # ¡CORREGIDO! Usando LOTE_ID
   #  data %>% ggplot(aes(x = LOTE_ID, y = TASA_RECHAZO)) + 
-    #  geom_point(size = 3, color = "#d9534f") + 
-    #  geom_segment(aes(x = LOTE_ID, xend = LOTE_ID, y = 0, yend = TASA_RECHAZO), color = "#d9534f") + 
-    #  labs(y = "Tasa de Rechazo (%)", x = "Lote") + 
-    #  theme_minimal(base_size = 14)
+  #  geom_point(size = 3, color = "#d9534f") + 
+  #  geom_segment(aes(x = LOTE_ID, xend = LOTE_ID, y = 0, yend = TASA_RECHAZO), color = "#d9534f") + 
+  #  labs(y = "Tasa de Rechazo (%)", x = "Lote") + 
+  #  theme_minimal(base_size = 14)
   #})
   
   # Tabla: Detalle de Recusados
@@ -1688,9 +1953,9 @@ output$table_promedios_semana <- DT::renderDataTable({
       ) +
       theme_minimal(base_size = 14) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotar etiquetas X
-  
     
-    })
+    
+  })
   
   
   # --- 11. Gráficos para el Reporte por Sector (Continuación) ---
@@ -1723,7 +1988,7 @@ output$table_promedios_semana <- DT::renderDataTable({
       # Si tienes muchos lotes, ajusta la leyenda o usa facet_wrap si es necesario
       guides(color = guide_legend(ncol = 2)) 
   })
-
+  
   
   
   
@@ -1738,7 +2003,7 @@ output$table_promedios_semana <- DT::renderDataTable({
   
   
   # Lógica: Si es Jefe de Sector y la pestaña es Ingreso, NO MOSTRAR
- # if (u$role == "JEFE_SECTOR" && actual == "tab_enfunde_ingreso") {
+  # if (u$role == "JEFE_SECTOR" && actual == "tab_enfunde_ingreso") {
   #  return(NULL)
   #}
   
@@ -1761,19 +2026,19 @@ output$table_promedios_semana <- DT::renderDataTable({
         return(NULL)
       }
     }
-      
-      
-      
-      
-      
-      
-      # Solo bloqueamos si estamos SEGUROS de que es la pestaña de ingreso.
-      # Si el valor es "" o NULL (instancia inicial), permitimos que se vean 
-      # para que no tengas que hacer clic para que 'aparezcan'.
-     # if (!is.null(actual) && actual == "tab_enfunde_ingreso") {
+    
+    
+    
+    
+    
+    
+    # Solo bloqueamos si estamos SEGUROS de que es la pestaña de ingreso.
+    # Si el valor es "" o NULL (instancia inicial), permitimos que se vean 
+    # para que no tengas que hacer clic para que 'aparezcan'.
+    # if (!is.null(actual) && actual == "tab_enfunde_ingreso") {
     #    return(NULL)
-     # }
-   # }
+    # }
+    # }
     
     # Si es Admin o es Jefe en otra pestaña, mostrar:
     fluidRow(
@@ -1823,5 +2088,50 @@ output$table_promedios_semana <- DT::renderDataTable({
   
   
   
+  # # --- VALIDACIÓN DINÁMICA DE SEMANAS EN EL REGISTRO ---
+  # observeEvent(input$enfunde_fecha, {
+  #   req(input$enfunde_fecha)
+  #   
+  #   # 1. Extraer el año de la fecha de registro seleccionada
+  #   ano_seleccionado <- as.numeric(format(input$enfunde_fecha, "%Y"))
+  #   
+  #   # 2. Definir el límite (2026 = 53, otros = 52)
+  #   max_semanas_registro <- if (ano_seleccionado == 2026) 53 else 52
+  #   
+  #   # 3. Actualizar el combo de entrada 'enfunde_semana'
+  #   updateSelectInput(session, "enfunde_semana",
+  #                     label = paste("Semana (Año", ano_seleccionado, "):"),
+  #                     choices = 1:max_semanas_registro,
+  #                     selected = input$enfunde_semana) # Mantiene la que estaba si es válida
+  # })
+  # 
   
-  }
+  # # --- ESTO VA EN EL SERVER.R ---
+  # observe({
+  #   # 1. Validamos que la fecha exista
+  #   req(input$enfunde_fecha)
+  #   
+  #   # 2. Extraemos el año de la fecha de registro
+  #   # format() nos da el año, as.numeric() lo vuelve número
+  #   anio_registro <- as.numeric(format(input$enfunde_fecha, "%Y"))
+  #   
+  #   # 3. Lógica del límite: 2026 tiene 53, los demás 52
+  #   max_permitido <- if (anio_registro == 2026) 53 else 52
+  #   
+  #   # DEBUG: Esto aparecerá en tu consola de RStudio para confirmar que funciona
+  #   #print(paste("Cambiando límites: Año", anio_registro, "- Max Semanas:", max_permitido))
+  #   
+  #   # 4. ACTUALIZACIÓN FORZOSA DEL COMBO
+  #   updateSelectInput(session, "enfunde_semana",
+  #                     choices = 1:max_permitido,
+  #                     selected = if(as.numeric(input$enfunde_semana) > max_permitido) 1 else input$enfunde_semana)
+  # })
+  # 
+  
+  
+  
+  
+ 
+  
+  
+}
