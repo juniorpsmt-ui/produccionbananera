@@ -247,6 +247,35 @@ server <- function(input, output, session) {
     shinyjs::runjs("$('#login_email').val(''); $('#login_password').val('');")
   })
   
+  ############################################################
+  
+  
+  
+  # --- COPIAR DESDE AQUÍ ---
+  
+  # 1. Detecta cuando el usuario cambia de pestaña y lo guarda en el historial
+  observeEvent(input$tabsid, {
+    req(input$tabsid) # Asegura que el ID existe
+    # Esto actualiza la URL en la barra de direcciones sin recargar la página
+    shiny::updateQueryString(paste0("?tab=", input$tabsid), mode = "push")
+  }, ignoreInit = TRUE)
+  
+  # 2. Permite que el botón "Atrás" del navegador funcione
+  observeEvent(session$clientData$url_search, {
+    query <- parseQueryString(session$clientData$url_search)
+    if (!is.null(query$tab)) {
+      # Si el usuario da 'atrás', Shiny lo mueve a la pestaña que guardamos en la URL
+      updateTabItems(session, "tabsid", query$tab)
+    }
+  })
+  
+  
+  
+  
+  
+  
+  
+  ############################################################
   
   # --- 4. MANEJADOR DEL BOTÓN DE LOGIN EN R (DEBE SER NUEVO) ---
   # Este bloque llama a la función 'do_login_js' en el JS
