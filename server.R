@@ -51,7 +51,19 @@ server <- function(input, output, session) {
   
   #######################################
   
- 
+  # 1. SENSOR SIEMPRE ACTIVO (Fuera del login)
+  shinyjs::runjs("
+    window.onpopstate = function(event) {
+      if (event.state && event.state.tab) {
+        Shiny.setInputValue('retroceder_definitivo', event.state.tab, {priority: 'event'});
+      }
+    };
+  ")
+  
+  # 2. EJECUTOR SIEMPRE ACTIVO
+  observeEvent(input$retroceder_definitivo, {
+    updateTabItems(session, "tabsid", input$retroceder_definitivo)
+  })
   #####################################
   
   
@@ -265,36 +277,17 @@ server <- function(input, output, session) {
     # 2. Si el login fue exitoso, activamos el historial del navegador
     if (input$login_status == "SUCCESS"){
       
-      # 1. ANCLAJE INICIAL: Creamos el primer punto en el historial con '#/'
-      shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#/home');")
+      # Creamos el anclaje inicial para que la flecha se ponga azul
+      # Usamos window.location.pathname para que Posit Connect no se salga del link oficial
+      shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', window.location.pathname);")
       
-      # 2. REGISTRO DE MOVIMIENTOS: Cada vez que cambies de pestaña
+      # Registramos cada cambio de pestaña
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        # El '#/' es vital para que Chrome no busque una web externa
         shinyjs::runjs(paste0(
-          "history.pushState({tab: '", input$tabsid, "'}, '', '#/", input$tabsid, "');"
+          "history.pushState({tab: '", input$tabsid, "'}, '', window.location.pathname);"
         ))
       }, ignoreInit = TRUE)
-      
-      # 3. SENSOR ÚNICO Y BLOQUEO: Captura el botón y evita la salida a Google
-      shinyjs::runjs("
-        window.onpopstate = function(event) {
-          if (event.state && event.state.tab) {
-            // Informamos a Shiny qué pestaña activar
-            Shiny.setInputValue('boton_atras_final', event.state.tab, {priority: 'event'});
-          } else {
-            // Si intenta salir, lo forzamos a quedarse en el home y bloqueamos la salida
-            history.pushState({tab: 'tab_enfunde_ingreso'}, '', '#/home');
-            Shiny.setInputValue('boton_atras_final', 'tab_enfunde_ingreso', {priority: 'event'});
-          }
-        };
-      ")
-      
-      # 4. EJECUTOR: Realiza el cambio físico de la pestaña
-      observeEvent(input$boton_atras_final, {
-        updateTabItems(session, "tabsid", input$boton_atras_final)
-      })
     }
   })
   
