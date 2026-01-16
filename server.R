@@ -253,48 +253,38 @@ server <- function(input, output, session) {
   ##############################
   
   
-  
-  
   observeEvent(input$login_status, {
     showNotification(input$login_status, type = "error", duration = 5)
-
-    # 2. Si el login fue exitoso, activamos el historial del navegador
-    if (input$login_status == "SUCCESS"){
+    
+    if (input$login_status == "SUCCESS") {
       
-      # 1. BLOQUEO TOTAL DE SALIDA Y SENSOR
-      # Este código 'atrapa' el botón de atrás para que no cierre la sesión
+      # A. PUNTO DE PARTIDA (Anclamos la App)
+      # Esto evita que el navegador busque en Google al dar atrás
       shinyjs::runjs("
-        (function() {
-          var ignoreHashChange = false;
-          
-          window.onhashchange = function() {
-            if (!ignoreHashChange) {
-              var tabId = window.location.hash.replace('#/', '');
-              if (tabId) {
-                Shiny.setInputValue('atras_definitivo', tabId, {priority: 'event'});
-              }
-            }
-            ignoreHashChange = false;
-          };
-
-          // Punto de partida
-          window.location.hash = '#/tab_enfunde_ingreso';
-        })();
+        window.location.hash = '#/home';
+        window.onhashchange = function() {
+          var tabId = window.location.hash.replace('#/', '');
+          if (tabId && tabId !== 'home') {
+            Shiny.setInputValue('atras_final_ok', tabId, {priority: 'event'});
+          }
+        };
       ")
       
-      # 2. REGISTRO DE PESTAÑAS
-      # Cada vez que cambies de pestaña, actualizamos el Hash sin recargar
+      # B. REGISTRO DE MOVIMIENTOS
+      # Cada vez que cambies de pestaña en el menú (tabsid)
       observeEvent(input$tabsid, {
         req(input$tabsid)
         shinyjs::runjs(paste0("window.location.hash = '#/", input$tabsid, "';"))
       }, ignoreInit = TRUE)
       
-      # 3. CAMBIO DE PESTAÑA REAL
-      observeEvent(input$atras_definitivo, {
-        updateTabItems(session, "tabsid", input$atras_definitivo)
+      # C. EJECUTOR DEL CAMBIO
+      # Mueve la pestaña físicamente sin refrescar la página
+      observeEvent(input$atras_final_ok, {
+        updateTabItems(session, "tabsid", input$atras_final_ok)
       })
     }
   })
+  
   
   
   #######################################
