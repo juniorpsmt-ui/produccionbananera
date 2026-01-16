@@ -256,27 +256,6 @@ server <- function(input, output, session) {
   # Memoria interna
   historial_pasos <- reactiveVal(c("tab_enfunde_ingreso"))
   
-  # Reloj detector (revisa cada 500ms si hubo un cambio en el navegador)
-  observe({
-    invalidateLater(500, session)
-    # Leemos un valor que JavaScript escribirá en el navegador
-    atras_solicitado <- input$js_atras_token
-    req(atras_solicitado)
-    
-    isolate({
-      pasos <- historial_pasos()
-      if (length(pasos) > 1) {
-        nueva_lista <- pasos[-length(pasos)]
-        pestaña_anterior <- nueva_lista[length(nueva_lista)]
-        historial_pasos(nueva_lista)
-        
-        # Limpiamos el token para que no se repita el movimiento
-        shinyjs::runjs("Shiny.setInputValue('js_atras_token', null);")
-        
-        updateTabItems(session, "tabsid", pestaña_anterior)
-      }
-    })
-  })
   
   
   
@@ -285,29 +264,48 @@ server <- function(input, output, session) {
   observeEvent(input$login_status, {
     if (input$login_status == "SUCCESS") {
       
-      # A. SECUESTRO DEL HISTORIAL
+      # A. SECUESTRO TOTAL DEL NAVEGADOR
       shinyjs::runjs("
         (function() {
-          // Forzamos un estado para que haya 'atrás'
-          history.pushState(null, null, location.href);
+          // 1. Forzamos un punto de anclaje para que la flecha se ponga azul
+          history.pushState({app: 'banano'}, '', window.location.pathname);
           
-          window.onpopstate = function() {
-            // Bloqueo inmediato para no ir a Google
-            history.pushState(null, null, location.href);
-            // Escribimos el token que R está vigilando
-            Shiny.setInputValue('js_atras_token', Math.random());
+          window.onpopstate = function(event) {
+            // 2. BLOQUEO: Si el usuario da atrás, lo empujamos de vuelta al sitio
+            history.pushState({app: 'banano'}, '', window.location.pathname);
+            // 3. SEÑAL: Enviamos un mensaje que Shiny NO pueda ignorar
+            Shiny.onInputChange('peticion_atras', Math.random());
           };
         })();
       ")
       
-      # B. REGISTRADOR DE CLICS
+      # B. REGISTRO DE PESTAÑAS (Cuando haces clic en el menú)
       observeEvent(input$tabsid, {
         req(input$tabsid)
         lista <- historial_pasos()
+        # Solo guardamos si la pestaña es nueva y distinta a la anterior
         if (input$tabsid != lista[length(lista)]) {
           historial_pasos(c(lista, input$tabsid))
         }
       }, ignoreInit = TRUE)
+      
+      # C. EJECUTOR DE RETROCESO (Lógica pura de R)
+      observeEvent(input$peticion_atras, {
+        pasos <- historial_pasos()
+        
+        if (length(pasos) > 1) {
+          # Quitamos la pestaña actual
+          nueva_lista <- pasos[-length(pasos)]
+          # Obtenemos la anterior
+          destino <- nueva_lista[length(nueva_lista)]
+          
+          # Actualizamos la memoria de R
+          historial_pasos(nueva_lista)
+          
+          # MOVEMOS LA PANTALLA
+          updateTabItems(session, 'tabsid', destino)
+        }
+      })
     }
   })
   
