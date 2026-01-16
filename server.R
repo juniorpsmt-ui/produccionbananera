@@ -274,7 +274,7 @@ server <- function(input, output, session) {
       observeEvent(input$tabsid, {
         req(input$tabsid)
         shinyjs::runjs(paste0(
-          "history.pushState({tab: '", input$tabsid, "'}, '', '?tab=", input$tabsid, "');"
+          "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
         ))
       }, ignoreInit = TRUE)
       
@@ -306,9 +306,13 @@ server <- function(input, output, session) {
   
   # 2. SENSOR PARA EL BOTÓN "ATRÁS" FÍSICO
   shinyjs::runjs("
-    window.onpopstate = function(event) {
+   window.onpopstate = function(event) {
       if (event.state && event.state.tab) {
-        Shiny.setInputValue('navegar_atras_windows', event.state.tab, {priority: 'event'});
+        // Esto le avisa a Shiny que cambie de pestaña
+        Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+      } else {
+        // Si no hay estado (intentando salir), forzamos que se quede en el home del dash
+        Shiny.setInputValue('boton_atras_windows', 'tab_enfunde_ingreso', {priority: 'event'});
       }
     };
   ")
