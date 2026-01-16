@@ -300,7 +300,7 @@ server <- function(input, output, session) {
     req(input$tabsid)
     # Esta línea envía la orden directa al historial del navegador
     shinyjs::runjs(paste0(
-      "history.pushState({tab: '", input$tabsid, "'}, '', '?tab=", input$tabsid, "');"
+      "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
     ))
   }, ignoreInit = TRUE)
   
