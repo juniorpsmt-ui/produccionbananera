@@ -49,6 +49,19 @@ tryCatch({
 server <- function(input, output, session) {
   
   
+  # MEMORIA PERSISTENTE (No depende del Login ni del Menú)
+  historial <- reactiveVal("tab_enfunde_ingreso")
+  
+  
+  
+  # Función para capturar movimientos (La definimos una sola vez)
+  registrar_movimiento <- function(nueva_tab) {
+    tmp <- historial()
+    if (nueva_tab != tmp[length(tmp)]) {
+      historial(c(tmp, nueva_tab))
+    }
+  }
+  
   
   
   user_email_js <- reactiveVal(NULL)
@@ -251,65 +264,28 @@ server <- function(input, output, session) {
   # 
   # 
   ##############################
-  # MEMORIA DE NAVEGACIÓN (Colocar al inicio, fuera de cualquier observe)
-  cola_pestanas <- reactiveVal(c("tab_enfunde_ingreso"))
-  
+
     ########################
   
   observeEvent(input$login_status, {
     if (input$login_status == "SUCCESS") {
-      # 1. Ocultar login y mostrar la App
       shinyjs::hide("login_panel")
       
-      # 2. Solo notificamos el éxito
-      showNotification("Acceso concedido", type = "message")
+      # Activamos el sensor de Windows una sola vez al entrar
+      shinyjs::runjs("
+        history.pushState({tab: 'tab_enfunde_ingreso'}, '', location.href);
+        window.onpopstate = function(event) {
+          if(event.state && event.state.tab) {
+            Shiny.setInputValue('navegar_atras_final', event.state.tab, {priority: 'event'});
+          }
+          history.pushState(null, null, location.href); // Bloqueo anti-Google
+        };
+      ")
     }
   })
-  
   #######################################
   
-  # ESTE BLOQUE SE ACTIVA SOLO CUANDO EL MENÚ APARECE EN PANTALLA
-  observeEvent(input$tabsid, {
-    # req() detiene la ejecución hasta que 'tabsid' sea real en la UI
-    req(input$tabsid)
-    
-    # A. CONFIGURAR EL SENSOR (Solo la primera vez que aparece el menú)
-    shinyjs::runjs("
-      if (typeof window.navegacionLista === 'undefined') {
-        window.navegacionLista = true;
-        
-        // Punto inicial en el historial
-        history.pushState({tab: 'tab_enfunde_ingreso'}, '', location.href);
-        
-        window.onpopstate = function(event) {
-          // Bloqueo para que no se vaya a Google
-          history.pushState(null, null, location.href);
-          
-          if (event.state && event.state.tab) {
-            // Enviamos la señal de retroceso a Shiny
-            Shiny.setInputValue('retroceder_desde_sensor', event.state.tab, {priority: 'event'});
-          }
-        };
-      }
-    ")
-    
-    # B. REGISTRAR CADA CAMBIO DE PESTAÑA
-    tmp <- cola_pestanas()
-    if (input$tabsid != tmp[length(tmp)]) {
-      cola_pestanas(c(tmp, input$tabsid))
-      # Guardamos el movimiento en el historial del navegador
-      shinyjs::runjs(paste0("history.pushState({tab: '", input$tabsid, "'}, '', location.href);"))
-    }
-  }, ignoreInit = TRUE)
-  
-  # C. EJECUTAR EL RETROCESO
-  observeEvent(input$retroceder_desde_sensor, {
-    req(input$retroceder_desde_sensor)
-    # Movemos el menú lateral a la pestaña guardada
-    updateTabItems(session, "tabsid", input$retroceder_desde_sensor)
-  })
-  
-  
+ 
   
   
   
@@ -2266,7 +2242,31 @@ output$tabla_ingresos_semanales <- DT::renderDataTable({
   # })
   # 
   
+  # 1. Vigila cuando el usuario cambia de pestaña manualmente
+  observe({
+    # req() CRÍTICO: Si el menú no existe (ej. antes del login), esto se detiene.
+    req(input$tabsid) 
+    
+    # Guardamos el movimiento en R
+    registrar_movimiento(input$tabsid)
+    
+    # Guardamos el movimiento en el Navegador
+    shinyjs::runjs(paste0("history.pushState({tab: '", input$tabsid, "'}, '', location.href);"))
+  })
   
+  # 2. Ejecuta el retroceso cuando presionan el botón de Windows/Chrome
+  observeEvent(input$navegar_atras_final, {
+    req(input$tabsid) # Asegura que el menú está ahí para recibir la orden
+    
+    pasos <- historial()
+    if (length(pasos) > 1) {
+      nueva_lista <- pasos[-length(pasos)]
+      anterior <- nueva_lista[length(nueva_lista)]
+      
+      historial(nueva_lista) # Actualizamos memoria
+      updateTabItems(session, "tabsid", anterior) # Movemos el formulario
+    }
+  })
   
   
  
