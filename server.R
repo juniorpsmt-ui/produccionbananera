@@ -251,60 +251,63 @@ server <- function(input, output, session) {
   # 
   # 
   ##############################
-  
-  historial_pasos <- reactiveVal(c("tab_enfunde_ingreso"))
 
+  
+  # Memoria interna
+  historial_pasos <- reactiveVal(c("tab_enfunde_ingreso"))
+  
+  # Reloj detector (revisa cada 500ms si hubo un cambio en el navegador)
+  observe({
+    invalidateLater(500, session)
+    # Leemos un valor que JavaScript escribirá en el navegador
+    atras_solicitado <- input$js_atras_token
+    req(atras_solicitado)
+    
+    isolate({
+      pasos <- historial_pasos()
+      if (length(pasos) > 1) {
+        nueva_lista <- pasos[-length(pasos)]
+        pestaña_anterior <- nueva_lista[length(nueva_lista)]
+        historial_pasos(nueva_lista)
+        
+        # Limpiamos el token para que no se repita el movimiento
+        shinyjs::runjs("Shiny.setInputValue('js_atras_token', null);")
+        
+        updateTabItems(session, "tabsid", pestaña_anterior)
+      }
+    })
+  })
+  
+  
   
     ########################
   
   observeEvent(input$login_status, {
     if (input$login_status == "SUCCESS") {
       
-      # A. SENSOR DE BOTÓN ATRÁS (JavaScript Directo)
+      # A. SECUESTRO DEL HISTORIAL
       shinyjs::runjs("
-        // 1. Limpiamos cualquier rastro previo
-        window.onpopstate = null;
-        
-        // 2. Creamos un punto de anclaje inicial
-        history.pushState({app: 'banano'}, '', window.location.pathname);
-
-        // 3. Sensor que atrapa el clic de 'Atrás'
-        window.onpopstate = function(event) {
-          // Bloqueo: evitamos que se salga de la página
-          history.pushState({app: 'banano'}, '', window.location.pathname);
-          // Avisamos a Shiny (usamos un número al azar para asegurar que el evento se dispare)
-          Shiny.setInputValue('ejecutar_retroceso', Math.random(), {priority: 'event'});
-        };
+        (function() {
+          // Forzamos un estado para que haya 'atrás'
+          history.pushState(null, null, location.href);
+          
+          window.onpopstate = function() {
+            // Bloqueo inmediato para no ir a Google
+            history.pushState(null, null, location.href);
+            // Escribimos el token que R está vigilando
+            Shiny.setInputValue('js_atras_token', Math.random());
+          };
+        })();
       ")
       
-      # B. REGISTRO DE PESTAÑAS (Cuando el usuario hace clic)
+      # B. REGISTRADOR DE CLICS
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        # Guardamos la pestaña actual en la lista de R
-        lista_actual <- historial_pasos()
-        if (input$tabsid != lista_actual[length(lista_actual)]) {
-          historial_pasos(c(lista_actual, input$tabsid))
+        lista <- historial_pasos()
+        if (input$tabsid != lista[length(lista)]) {
+          historial_pasos(c(lista, input$tabsid))
         }
       }, ignoreInit = TRUE)
-      
-      # C. ACCIÓN DE RETROCEDER (Lo que mueve la pantalla)
-      observeEvent(input$ejecutar_retroceso, {
-        pasos <- historial_pasos()
-        
-        if (length(pasos) > 1) {
-          # Eliminamos la pestaña donde estamos
-          nueva_lista <- pasos[-length(pasos)]
-          # Obtenemos la anterior
-          pestaña_destino <- nueva_lista[length(nueva_lista)]
-          
-          # Actualizamos memoria y movemos la interfaz
-          historial_pasos(nueva_lista)
-          updateTabItems(session, "tabsid", pestaña_destino)
-          
-          # Notificación opcional para confirmar que funcionó (puedes borrarla luego)
-          showNotification(paste("Volviendo a:", pestaña_destino), duration = 2)
-        }
-      })
     }
   })
   
