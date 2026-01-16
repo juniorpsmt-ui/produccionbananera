@@ -258,30 +258,23 @@ server <- function(input, output, session) {
     
     if (input$login_status == "SUCCESS") {
       
-      # A. PUNTO DE PARTIDA (Anclamos la App)
-      # Esto evita que el navegador busque en Google al dar atrás
-      shinyjs::runjs("
-        window.location.hash = '#/home';
-        window.onhashchange = function() {
-          var tabId = window.location.hash.replace('#/', '');
-          if (tabId && tabId !== 'home') {
-            Shiny.setInputValue('atras_final_ok', tabId, {priority: 'event'});
-          }
-        };
-      ")
+      # 1. ACTIVAR EL ESCUCHA DE LA URL
+      # Esto detecta cuando el usuario cambia la URL (al dar atrás)
+      observe({
+        query <- parseQueryString(session$clientData$url_search)
+        if (!is.null(query[['tab']])) {
+          updateTabItems(session, "tabsid", query[['tab']])
+        }
+      })
       
-      # B. REGISTRO DE MOVIMIENTOS
-      # Cada vez que cambies de pestaña en el menú (tabsid)
+      # 2. REGISTRAR EL MOVIMIENTO EN LA BARRA DE DIRECCIONES
+      # Cada vez que hagas clic en el menú, la URL cambiará a ?tab=nombre
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        shinyjs::runjs(paste0("window.location.hash = '#/", input$tabsid, "';"))
+        # Esta línea es la que engaña a Windows para que la flecha se ponga azul
+        shinyjs::runjs(paste0("history.pushState({}, '', '?tab=", input$tabsid, "');"))
       }, ignoreInit = TRUE)
       
-      # C. EJECUTOR DEL CAMBIO
-      # Mueve la pestaña físicamente sin refrescar la página
-      observeEvent(input$atras_final_ok, {
-        updateTabItems(session, "tabsid", input$atras_final_ok)
-      })
     }
   })
   
