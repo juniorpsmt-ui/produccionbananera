@@ -261,34 +261,37 @@ server <- function(input, output, session) {
     # 2. Si el login fue exitoso, activamos el historial del navegador
     if (input$login_status == "SUCCESS"){
       
-      # A. INICIALIZACIÓN: Creamos un punto de retorno falso
-      # Esto hace que la flecha se ponga azul pero no cambie la URL real
+      # 1. BLOQUEO TOTAL DE SALIDA Y SENSOR
+      # Este código 'atrapa' el botón de atrás para que no cierre la sesión
       shinyjs::runjs("
-        history.pushState({tab: 'tab_enfunde_ingreso'}, '', window.location.href);
-
-        window.onpopstate = function(event) {
-          // BLOQUEO DE SALIDA: Si el navegador intenta irse, lo obligamos a quedarse
-          history.pushState({tab: 'tab_enfunde_ingreso'}, '', window.location.href);
+        (function() {
+          var ignoreHashChange = false;
           
-          if (event.state && event.state.tab) {
-            // Mandamos la orden a Shiny
-            Shiny.setInputValue('retroceder_real', event.state.tab, {priority: 'event'});
-          }
-        };
+          window.onhashchange = function() {
+            if (!ignoreHashChange) {
+              var tabId = window.location.hash.replace('#/', '');
+              if (tabId) {
+                Shiny.setInputValue('atras_definitivo', tabId, {priority: 'event'});
+              }
+            }
+            ignoreHashChange = false;
+          };
+
+          // Punto de partida
+          window.location.hash = '#/tab_enfunde_ingreso';
+        })();
       ")
       
-      # B. SEGUIMIENTO: Cada vez que el usuario haga clic en una pestaña
+      # 2. REGISTRO DE PESTAÑAS
+      # Cada vez que cambies de pestaña, actualizamos el Hash sin recargar
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        # Guardamos la pestaña en el historial invisible
-        shinyjs::runjs(paste0(
-          "history.pushState({tab: '", input$tabsid, "'}, '', window.location.href);"
-        ))
+        shinyjs::runjs(paste0("window.location.hash = '#/", input$tabsid, "';"))
       }, ignoreInit = TRUE)
       
-      # C. ACCIÓN: Mover la pestaña en la pantalla
-      observeEvent(input$retroceder_real, {
-        updateTabItems(session, "tabsid", input$retroceder_real)
+      # 3. CAMBIO DE PESTAÑA REAL
+      observeEvent(input$atras_definitivo, {
+        updateTabItems(session, "tabsid", input$atras_definitivo)
       })
     }
   })
