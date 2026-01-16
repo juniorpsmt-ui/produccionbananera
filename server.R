@@ -258,36 +258,48 @@ server <- function(input, output, session) {
     
     if (input$login_status == "SUCCESS") {
       
-      # 1. SETUP INICIAL: Preparamos el terreno
+      # A. CREAR EL BLOQUEO DE SALIDA (Escudo anti-Google)
       shinyjs::runjs("
-        // Limpiamos cualquier rastro anterior para evitar conflictos
-        window.onpopstate = null;
-        
-        // Creamos la primera marca en el historial
-        history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#/');
+        // 1. Forzamos una entrada en el historial sin cambiar la URL
+        history.pushState(null, null, window.location.href);
 
         window.onpopstate = function(event) {
-          if (event.state && event.state.tab) {
-            // Enviamos la señal a Shiny usando un ID totalmente NUEVO
-            Shiny.setInputValue('ir_atras_final_verdadero', event.state.tab, {priority: 'event'});
-          }
+          // 2. Si el usuario da 'Atrás', lo obligamos a quedarse en la página
+          history.pushState(null, null, window.location.href);
+          
+          // 3. Disparamos una alerta interna para Shiny
+          Shiny.setInputValue('boton_atras_detectado', Math.random(), {priority: 'event'});
         };
       ")
       
-      # 2. SEGUIMIENTO DE PESTAÑAS: Cada vez que el usuario haga clic en el menú
+      # B. SEGUIMIENTO DE RASTRO (Memoria de pestañas)
+      # Usamos una lista en R para guardar el orden en que visitaste las pestañas
+      historial_pestanas <- reactiveVal(c("tab_enfunde_ingreso"))
+      
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        # Registramos el movimiento en el historial del navegador
-        # El '#/' es lo que evita que Posit Connect te mande a Google
-        shinyjs::runjs(paste0(
-          "history.pushState({tab: '", input$tabsid, "'}, '', '#/", input$tabsid, "');"
-        ))
+        actual <- historial_pestanas()
+        # Si la pestaña nueva es diferente a la última, la guardamos
+        if (input$tabsid != last(actual)) {
+          historial_pestanas(c(actual, input$tabsid))
+        }
       }, ignoreInit = TRUE)
       
-      # 3. EL MOTOR DE RETROCESO: Lo que realmente mueve la pantalla
-      observeEvent(input$ir_atras_final_verdadero, {
-        # Esta línea obliga a Shiny a cambiar la pestaña activa
-        updateTabItems(session, "tabsid", input$ir_atras_final_verdadero)
+      # C. EJECUTOR DEL RETROCESO (Lógica de R)
+      observeEvent(input$boton_atras_detectado, {
+        pasos <- historial_pestanas()
+        
+        if (length(pasos) > 1) {
+          # Eliminamos la pestaña actual y obtenemos la anterior
+          nueva_lista <- pasos[-length(pasos)]
+          anterior <- last(nueva_lista)
+          
+          # Actualizamos la lista y movemos la pestaña en la pantalla
+          historial_pestanas(nueva_lista)
+          updateTabItems(session, "tabsid", anterior)
+        } else {
+          showNotification("Ya estás en el inicio", type = "message")
+        }
       })
     }
   })
