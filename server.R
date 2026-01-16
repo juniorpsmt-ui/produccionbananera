@@ -239,11 +239,36 @@ server <- function(input, output, session) {
     user_email_js(input$firebase_user_email)
   })
   
+  ##############################
+  
+  shinyjs::runjs("
+    window.onpopstate = function(event) {
+      if (event.state && event.state.tab) {
+        Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+      }
+    };
+  ")
+  
+  observeEvent(input$boton_atras_windows, {
+    updateTabItems(session, "tabsid", input$boton_atras_windows)
+  })
+  
+  
+  ##############################
+  
+  
+  
+  
   observeEvent(input$login_status, {
     showNotification(input$login_status, type = "error", duration = 5)
 
     # 2. Si el login fue exitoso, activamos el historial del navegador
     if (input$login_status == "SUCCESS") {
+      
+      # Agregamos un delay de medio segundo (500ms) para que la UI cargue primero
+      shinyjs::delay(500, {
+        shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '');")
+      })
       
       # Código para que Windows habilite las flechas azul de "Atrás"
       observeEvent(input$tabsid, {
@@ -253,19 +278,8 @@ server <- function(input, output, session) {
         ))
       }, ignoreInit = TRUE)
       
-      # Código para detectar cuando el usuario aplasta el botón "Atrás" de su mouse o teclado
-      shinyjs::runjs("
-        window.onpopstate = function(event) {
-          if (event.state && event.state.tab) {
-            Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
-          }
-        };
-      ")
-      
-      # Código para mover la pestaña al volver atrás
-      observeEvent(input$boton_atras_windows, {
-        updateTabItems(session, "tabsid", input$boton_atras_windows)
-      })
+  
+    
     }
   })
   
