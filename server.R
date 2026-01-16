@@ -258,28 +258,36 @@ server <- function(input, output, session) {
     
     if (input$login_status == "SUCCESS") {
       
-      # 1. CREAR EL RASTRO (Cada vez que cambias de pestaña)
-      observeEvent(input$tabsid, {
-        req(input$tabsid)
-        # Usamos '#' para que el navegador NO intente buscar una web externa
-        # Esto activa la flecha azul sin salir de la página
-        shinyjs::runjs(paste0("history.pushState({pestaña: '", input$tabsid, "'}, '', '#", input$tabsid, "');"))
-      }, ignoreInit = TRUE)
-      
-      # 2. CAPTURAR EL BOTÓN ATRÁS (El sensor)
+      # 1. SETUP INICIAL: Preparamos el terreno
       shinyjs::runjs("
+        // Limpiamos cualquier rastro anterior para evitar conflictos
+        window.onpopstate = null;
+        
+        // Creamos la primera marca en el historial
+        history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#/');
+
         window.onpopstate = function(event) {
-          if (event.state && event.state.pestaña) {
-            // Enviamos a Shiny la pestaña a la que debe volver
-            Shiny.setInputValue('pestaña_recuperada', event.state.pestaña, {priority: 'event'});
+          if (event.state && event.state.tab) {
+            // Enviamos la señal a Shiny usando un ID totalmente NUEVO
+            Shiny.setInputValue('ir_atras_final_verdadero', event.state.tab, {priority: 'event'});
           }
         };
       ")
       
-      # 3. EJECUTAR EL RETROCESO
-      observeEvent(input$pestaña_recuperada, {
-        # Esta línea mueve el menú lateral a la pestaña guardada
-        updateTabItems(session, "tabsid", input$pestaña_recuperada)
+      # 2. SEGUIMIENTO DE PESTAÑAS: Cada vez que el usuario haga clic en el menú
+      observeEvent(input$tabsid, {
+        req(input$tabsid)
+        # Registramos el movimiento en el historial del navegador
+        # El '#/' es lo que evita que Posit Connect te mande a Google
+        shinyjs::runjs(paste0(
+          "history.pushState({tab: '", input$tabsid, "'}, '', '#/", input$tabsid, "');"
+        ))
+      }, ignoreInit = TRUE)
+      
+      # 3. EL MOTOR DE RETROCESO: Lo que realmente mueve la pantalla
+      observeEvent(input$ir_atras_final_verdadero, {
+        # Esta línea obliga a Shiny a cambiar la pestaña activa
+        updateTabItems(session, "tabsid", input$ir_atras_final_verdadero)
       })
     }
   })
