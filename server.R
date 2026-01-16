@@ -259,42 +259,29 @@ server <- function(input, output, session) {
     ########################
   
   observeEvent(input$login_status, {
-    if (input$login_status == "SUCCESS") {
+    if (input$login_status == "SUCCESS"){
       
-      # A. SENSOR DE ALTO NIVEL
+      # 1. CÓDIGO JS MÍNIMO (Solo para activar la flecha del navegador)
       shinyjs::runjs("
-        (function() {
-          // 1. Punto de anclaje
-          history.replaceState({tab: 'tab_enfunde_ingreso'}, '', window.location.pathname);
-          
-          // 2. Cada vez que el usuario haga clic en el menú, guardamos la pestaña en el historial del navegador
-          $(document).on('click', '.sidebar-menu a', function() {
-            var tabName = $(this).attr('data-value');
-            if(tabName) {
-              history.pushState({tab: tabName}, '', window.location.pathname);
-            }
-          });
+        // Cada vez que cambie la pestaña, actualizamos la URL con un '#'
+        // Esto NO recarga la página, así que Posit Connect no te botará.
+        $(document).on('shiny:inputchanged', function(event) {
+          if (event.name === 'tabsid') {
+            history.pushState({tab: event.value}, '', '#' + event.value);
+          }
+        });
 
-          // 3. Sensor del botón atrás
-          window.onpopstate = function(event) {
-            if (event.state && event.state.tab) {
-              // BLOQUEO DE SALIDA
-              history.replaceState({tab: event.state.tab}, '', window.location.pathname);
-              // ORDEN DIRECTA A SHINY
-              Shiny.setInputValue('ir_atras_urgente', event.state.tab, {priority: 'event'});
-            }
-          };
-        })();
+        // Este es el sensor del botón 'Atrás' de Windows/Chrome
+        window.onpopstate = function(event) {
+          if (event.state && event.state.tab) {
+            Shiny.setInputValue('tabsid', event.state.tab);
+          }
+        };
       ")
       
-      # B. MOTOR DE CAMBIO (R)
-      observeEvent(input$ir_atras_urgente, {
-        req(input$ir_atras_urgente)
-        # Actualizamos la pestaña físicamente
-        updateTabItems(session, "tabsid", input$ir_atras_urgente)
-        
-        # Notificación para que veas que sí está trabajando
-        showNotification(paste("Cargando:", input$ir_atras_urgente), type = "message", duration = 1)
+      # 2. REFUERZO EN R (Para asegurar que la pestaña cambie)
+      observeEvent(input$tabsid, {
+        updateTabItems(session, "tabsid", input$tabsid)
       })
     }
   })
