@@ -253,61 +253,59 @@ server <- function(input, output, session) {
   ##############################
   
   
+  # Memoria global del historial (FUERA DE CUALQUIER FUNCIÓN O EVENTO)
+  cola_pestanas <- reactiveVal(c("tab_enfunde_ingreso"))
+  
+  ########################
+  
   observeEvent(input$login_status, {
     showNotification(input$login_status, type = "error", duration = 5)
     
     if (input$login_status == "SUCCESS") {
       
-      # A. CREAR EL ANCLA INVISIBLE (Solo una vez al entrar)
-      # Esto activa el botón de atrás pero le dice al navegador que NO cambie de dirección
+      # A. ACTIVAR EL BOTÓN DE ATRÁS (JavaScript)
       shinyjs::runjs("
         (function() {
-          // Empujamos un estado nulo para activar la flecha azul
-          history.pushState(null, null, location.href);
+          // Crea un punto en el historial para que la flecha se ponga azul
+          history.pushState({rastreo: true}, '', location.href);
           
           window.onpopstate = function(event) {
-            // BLOQUEO INMEDIATO: Evita que el navegador cargue Google
-            history.pushState(null, null, location.href);
-            // Avisamos a Shiny que el usuario quiere retroceder
-            Shiny.setInputValue('disparador_atras', Math.random(), {priority: 'event'});
+            // Bloquea que se salga a Google y avisa a Shiny
+            history.pushState({rastreo: true}, '', location.href);
+            Shiny.setInputValue('presionaron_atras', Math.random(), {priority: 'event'});
           };
         })();
       ")
       
-      # B. SISTEMA DE MEMORIA EN R
-      # Guardamos el orden de las pestañas en una lista interna de Shiny
-      cola_pestanas <- reactiveVal(c("tab_enfunde_ingreso"))
-      
+      # B. REGISTRAR CADA CLIC EN EL MENÚ
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        actuales <- cola_pestanas()
-        # Si la pestaña es nueva, la anotamos en la lista
-        if (input$tabsid != last(actuales)) {
-          cola_pestanas(c(actuales, input$tabsid))
+        # Guardamos la pestaña actual en nuestra lista de R
+        tmp <- cola_pestanas()
+        if (input$tabsid != tmp[length(tmp)]) {
+          cola_pestanas(c(tmp, input$tabsid))
         }
       }, ignoreInit = TRUE)
       
-      # C. EL MOTOR DE RETROCESO
-      # Cuando se detecta el clic en 'atrás', Shiny busca en su propia memoria
-      observeEvent(input$disparador_atras, {
+      # C. EJECUTAR EL RETROCESO REAL
+      observeEvent(input$presionaron_atras, {
         pasos <- cola_pestanas()
         
         if (length(pasos) > 1) {
-          # Quitamos la pestaña actual y vemos cuál era la anterior
+          # 1. Quitamos la pestaña donde estamos ahora
           nueva_lista <- pasos[-length(pasos)]
-          pestana_anterior <- last(nueva_lista)
+          # 2. Obtenemos la pestaña que estaba antes
+          pestaña_anterior <- nueva_lista[length(nueva_lista)]
           
-          # Actualizamos la memoria y movemos la pantalla
+          # 3. Actualizamos la memoria
           cola_pestanas(nueva_lista)
-          updateTabItems(session, "tabsid", pestana_anterior)
-        } else {
-          showNotification("Inicio del historial", type = 'message')
+          
+          # 4. CAMBIAMOS LA PANTALLA
+          updateTabItems(session, "tabsid", pestaña_anterior)
         }
       })
     }
-      
   })
-  
   
   
   #######################################
