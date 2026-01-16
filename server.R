@@ -251,11 +251,8 @@ server <- function(input, output, session) {
   # 
   # 
   ##############################
-
-  
-  # Memoria interna
-  historial_pasos <- reactiveVal(c("tab_enfunde_ingreso"))
-  
+  # Historial interno de R (para control de seguridad)
+  historial_navegacion <- reactiveVal(c("tab_enfunde_ingreso"))
   
   
   
@@ -264,51 +261,43 @@ server <- function(input, output, session) {
   observeEvent(input$login_status, {
     if (input$login_status == "SUCCESS") {
       
-      # A. SECUESTRO TOTAL DEL NAVEGADOR
+      # A. SENSOR DE ALTO NIVEL
       shinyjs::runjs("
         (function() {
-          // 1. Forzamos un punto de anclaje para que la flecha se ponga azul
-          history.pushState({app: 'banano'}, '', window.location.pathname);
+          // 1. Punto de anclaje
+          history.replaceState({tab: 'tab_enfunde_ingreso'}, '', window.location.pathname);
           
+          // 2. Cada vez que el usuario haga clic en el menú, guardamos la pestaña en el historial del navegador
+          $(document).on('click', '.sidebar-menu a', function() {
+            var tabName = $(this).attr('data-value');
+            if(tabName) {
+              history.pushState({tab: tabName}, '', window.location.pathname);
+            }
+          });
+
+          // 3. Sensor del botón atrás
           window.onpopstate = function(event) {
-            // 2. BLOQUEO: Si el usuario da atrás, lo empujamos de vuelta al sitio
-            history.pushState({app: 'banano'}, '', window.location.pathname);
-            // 3. SEÑAL: Enviamos un mensaje que Shiny NO pueda ignorar
-            Shiny.onInputChange('peticion_atras', Math.random());
+            if (event.state && event.state.tab) {
+              // BLOQUEO DE SALIDA
+              history.replaceState({tab: event.state.tab}, '', window.location.pathname);
+              // ORDEN DIRECTA A SHINY
+              Shiny.setInputValue('ir_atras_urgente', event.state.tab, {priority: 'event'});
+            }
           };
         })();
       ")
       
-      # B. REGISTRO DE PESTAÑAS (Cuando haces clic en el menú)
-      observeEvent(input$tabsid, {
-        req(input$tabsid)
-        lista <- historial_pasos()
-        # Solo guardamos si la pestaña es nueva y distinta a la anterior
-        if (input$tabsid != lista[length(lista)]) {
-          historial_pasos(c(lista, input$tabsid))
-        }
-      }, ignoreInit = TRUE)
-      
-      # C. EJECUTOR DE RETROCESO (Lógica pura de R)
-      observeEvent(input$peticion_atras, {
-        pasos <- historial_pasos()
+      # B. MOTOR DE CAMBIO (R)
+      observeEvent(input$ir_atras_urgente, {
+        req(input$ir_atras_urgente)
+        # Actualizamos la pestaña físicamente
+        updateTabItems(session, "tabsid", input$ir_atras_urgente)
         
-        if (length(pasos) > 1) {
-          # Quitamos la pestaña actual
-          nueva_lista <- pasos[-length(pasos)]
-          # Obtenemos la anterior
-          destino <- nueva_lista[length(nueva_lista)]
-          
-          # Actualizamos la memoria de R
-          historial_pasos(nueva_lista)
-          
-          # MOVEMOS LA PANTALLA
-          updateTabItems(session, 'tabsid', destino)
-        }
+        # Notificación para que veas que sí está trabajando
+        showNotification(paste("Cargando:", input$ir_atras_urgente), type = "message", duration = 1)
       })
     }
   })
-  
   
   #######################################
   
