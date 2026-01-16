@@ -263,35 +263,35 @@ server <- function(input, output, session) {
     showNotification(input$login_status, type = "error", duration = 5)
 
     # 2. Si el login fue exitoso, activamos el historial del navegador
-    if (input$login_status == "SUCCESS") {
+    if (input$login_status == "SUCCESS"){
       
-      # A. PUNTO DE INICIO (Evita que el botón esté gris al entrar)
-      shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#home');")
+      # 1. ANCLAJE INICIAL: Creamos el primer punto en el historial con '#/'
+      shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#/home');")
       
-      # B. REGISTRO DE MOVIMIENTOS (Usa '#' para no salir de Posit)
+      # 2. REGISTRO DE MOVIMIENTOS: Cada vez que cambies de pestaña
       observeEvent(input$tabsid, {
         req(input$tabsid)
+        # El '#/' es vital para que Chrome no busque una web externa
         shinyjs::runjs(paste0(
-          "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
+          "history.pushState({tab: '", input$tabsid, "'}, '', '#/", input$tabsid, "');"
         ))
       }, ignoreInit = TRUE)
       
-      # C. EL SENSOR ÚNICO (Captura el botón de Windows)
+      # 3. SENSOR ÚNICO Y BLOQUEO: Captura el botón y evita la salida a Google
       shinyjs::runjs("
-      // 1. Forzamos un estado inicial para que siempre haya un 'atrás' que capturar
-        history.pushState(null, null, window.location.href);
-
         window.onpopstate = function(event) {
-          // 2. Bloqueamos que el navegador se vaya a Google
-          history.pushState(null, null, window.location.href);
-          
-          // 3. Si hay una pestaña guardada, la activamos
           if (event.state && event.state.tab) {
-            Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+            // Informamos a Shiny qué pestaña activar
+            Shiny.setInputValue('boton_atras_final', event.state.tab, {priority: 'event'});
+          } else {
+            // Si intenta salir, lo forzamos a quedarse en el home y bloqueamos la salida
+            history.pushState({tab: 'tab_enfunde_ingreso'}, '', '#/home');
+            Shiny.setInputValue('boton_atras_final', 'tab_enfunde_ingreso', {priority: 'event'});
           }
         };
       ")
-      # D. EL EJECUTOR (Mueve la pestaña)
+      
+      # 4. EJECUTOR: Realiza el cambio físico de la pestaña
       observeEvent(input$boton_atras_final, {
         updateTabItems(session, "tabsid", input$boton_atras_final)
       })
