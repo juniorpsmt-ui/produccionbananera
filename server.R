@@ -258,23 +258,29 @@ server <- function(input, output, session) {
     
     if (input$login_status == "SUCCESS") {
       
-      # 1. ACTIVAR EL ESCUCHA DE LA URL
-      # Esto detecta cuando el usuario cambia la URL (al dar atrás)
-      observe({
-        query <- parseQueryString(session$clientData$url_search)
-        if (!is.null(query[['tab']])) {
-          updateTabItems(session, "tabsid", query[['tab']])
-        }
-      })
-      
-      # 2. REGISTRAR EL MOVIMIENTO EN LA BARRA DE DIRECCIONES
-      # Cada vez que hagas clic en el menú, la URL cambiará a ?tab=nombre
+      # 1. CREAR EL RASTRO (Cada vez que cambias de pestaña)
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        # Esta línea es la que engaña a Windows para que la flecha se ponga azul
-        shinyjs::runjs(paste0("history.pushState({}, '', '?tab=", input$tabsid, "');"))
+        # Usamos '#' para que el navegador NO intente buscar una web externa
+        # Esto activa la flecha azul sin salir de la página
+        shinyjs::runjs(paste0("history.pushState({pestaña: '", input$tabsid, "'}, '', '#", input$tabsid, "');"))
       }, ignoreInit = TRUE)
       
+      # 2. CAPTURAR EL BOTÓN ATRÁS (El sensor)
+      shinyjs::runjs("
+        window.onpopstate = function(event) {
+          if (event.state && event.state.pestaña) {
+            // Enviamos a Shiny la pestaña a la que debe volver
+            Shiny.setInputValue('pestaña_recuperada', event.state.pestaña, {priority: 'event'});
+          }
+        };
+      ")
+      
+      # 3. EJECUTAR EL RETROCESO
+      observeEvent(input$pestaña_recuperada, {
+        # Esta línea mueve el menú lateral a la pestaña guardada
+        updateTabItems(session, "tabsid", input$pestaña_recuperada)
+      })
     }
   })
   
