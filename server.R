@@ -49,6 +49,10 @@ tryCatch({
 server <- function(input, output, session) {
   
   
+  #######################################
+  
+ 
+  #####################################
   
   
   user_email_js <- reactiveVal(NULL)
@@ -237,6 +241,32 @@ server <- function(input, output, session) {
   
   observeEvent(input$login_status, {
     showNotification(input$login_status, type = "error", duration = 5)
+
+    # 2. Si el login fue exitoso, activamos el historial del navegador
+    if (input$login_status == "SUCCESS") {
+      
+      # Código para que Windows habilite las flechas azul de "Atrás"
+      observeEvent(input$tabsid, {
+        req(input$tabsid)
+        shinyjs::runjs(paste0(
+          "history.pushState({tab: '", input$tabsid, "'}, '', '?tab=", input$tabsid, "');"
+        ))
+      }, ignoreInit = TRUE)
+      
+      # Código para detectar cuando el usuario aplasta el botón "Atrás" de su mouse o teclado
+      shinyjs::runjs("
+        window.onpopstate = function(event) {
+          if (event.state && event.state.tab) {
+            Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+          }
+        };
+      ")
+      
+      # Código para mover la pestaña al volver atrás
+      observeEvent(input$boton_atras_windows, {
+        updateTabItems(session, "tabsid", input$boton_atras_windows)
+      })
+    }
   })
   
   observeEvent(input$logout_btn, {
@@ -249,32 +279,32 @@ server <- function(input, output, session) {
   
   ############################################################
   
+  # --- DENTRO DEL BLOQUE DE LOGIN EXITOSO ---
   
-  
-  # --- COPIAR DESDE AQUÍ ---
-  
-  # 1. Detecta cuando el usuario cambia de pestaña y lo guarda en el historial
+  # 1. FORZAR AL NAVEGADOR A REGISTRAR CADA CLIC (Habilita las flechas de Windows)
   observeEvent(input$tabsid, {
-    req(input$tabsid) # Asegura que el ID existe
-    # Esto actualiza la URL en la barra de direcciones sin recargar la página
-    shiny::updateQueryString(paste0("?tab=", input$tabsid), mode = "push")
+    req(input$tabsid)
+    # Esta línea envía la orden directa al historial del navegador
+    shinyjs::runjs(paste0(
+      "history.pushState({tab: '", input$tabsid, "'}, '', '?tab=", input$tabsid, "');"
+    ))
   }, ignoreInit = TRUE)
   
-  # 2. Permite que el botón "Atrás" del navegador funcione
-  observeEvent(session$clientData$url_search, {
-    query <- parseQueryString(session$clientData$url_search)
-    if (!is.null(query$tab)) {
-      # Si el usuario da 'atrás', Shiny lo mueve a la pestaña que guardamos en la URL
-      updateTabItems(session, "tabsid", query$tab)
-    }
+  # 2. SENSOR PARA EL BOTÓN "ATRÁS" FÍSICO
+  shinyjs::runjs("
+    window.onpopstate = function(event) {
+      if (event.state && event.state.tab) {
+        Shiny.setInputValue('navegar_atras_windows', event.state.tab, {priority: 'event'});
+      }
+    };
+  ")
+  
+  # 3. ACCIÓN DE RETROCEDER PESTAÑA
+  observeEvent(input$navegar_atras_windows, {
+    updateTabItems(session, "tabsid", input$navegar_atras_windows)
   })
   
-  
-  
-  
-  
-  
-  
+ 
   ############################################################
   
   # --- 4. MANEJADOR DEL BOTÓN DE LOGIN EN R (DEBE SER NUEVO) ---
@@ -1397,7 +1427,7 @@ server <- function(input, output, session) {
     
     # Generar el control de selección
     selectInput(
-      "filtro_semana_consulta", # ID que usa tu lógica de Firebase
+      "filtro_semana", # ID que usa tu lógica de Firebase
       "Filtrar por Semana:", 
       choices = opciones,
       selected = "Todos"
@@ -2055,11 +2085,6 @@ output$tabla_ingresos_semanales <- DT::renderDataTable({
         return(NULL)
       }
     }
-    
-    
-    
-    
-    
     
     # Solo bloqueamos si estamos SEGUROS de que es la pestaña de ingreso.
     # Si el valor es "" o NULL (instancia inicial), permitimos que se vean 
