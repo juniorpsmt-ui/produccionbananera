@@ -49,22 +49,6 @@ tryCatch({
 server <- function(input, output, session) {
   
   
-  #######################################
-  
-  # 1. SENSOR SIEMPRE ACTIVO (Fuera del login)
-  shinyjs::runjs("
-    window.onpopstate = function(event) {
-      if (event.state && event.state.tab) {
-        Shiny.setInputValue('retroceder_definitivo', event.state.tab, {priority: 'event'});
-      }
-    };
-  ")
-  
-  # 2. EJECUTOR SIEMPRE ACTIVO
-  observeEvent(input$retroceder_definitivo, {
-    updateTabItems(session, "tabsid", input$retroceder_definitivo)
-  })
-  #####################################
   
   
   user_email_js <- reactiveVal(NULL)
@@ -308,6 +292,29 @@ server <- function(input, output, session) {
   })
   
   ############################################################
+  
+  #######################################
+  
+  # 1. SENSOR SIEMPRE ACTIVO (Fuera del login)
+  shinyjs::runjs("
+    window.onpopstate = function(event) {
+      if (event.state && event.state.tab) {
+        Shiny.setInputValue('retroceder_definitivo', event.state.tab, {priority: 'event'});
+      }
+    };
+  ")
+  
+  # 2. EJECUTOR SIEMPRE ACTIVO
+  observeEvent(input$retroceder_definitivo, {
+    updateTabItems(session, "tabsid", input$retroceder_definitivo)
+  })
+  #####################################
+  
+  
+  
+  
+  
+  
   
   # # --- DENTRO DEL BLOQUE DE LOGIN EXITOSO ---
   # 
