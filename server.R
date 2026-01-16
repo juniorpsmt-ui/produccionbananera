@@ -252,56 +252,57 @@ server <- function(input, output, session) {
   # 
   ##############################
   
+  historial_pasos <- reactiveVal(c("tab_enfunde_ingreso"))
+
   
-  # Memoria global del historial (FUERA DE CUALQUIER FUNCIÓN O EVENTO)
-  cola_pestanas <- reactiveVal(c("tab_enfunde_ingreso"))
-  
-  ########################
+    ########################
   
   observeEvent(input$login_status, {
-    showNotification(input$login_status, type = "error", duration = 5)
-    
     if (input$login_status == "SUCCESS") {
       
-      # A. ACTIVAR EL BOTÓN DE ATRÁS (JavaScript)
+      # A. SENSOR DE BOTÓN ATRÁS (JavaScript Directo)
       shinyjs::runjs("
-        (function() {
-          // Crea un punto en el historial para que la flecha se ponga azul
-          history.pushState({rastreo: true}, '', location.href);
-          
-          window.onpopstate = function(event) {
-            // Bloquea que se salga a Google y avisa a Shiny
-            history.pushState({rastreo: true}, '', location.href);
-            Shiny.setInputValue('presionaron_atras', Math.random(), {priority: 'event'});
-          };
-        })();
+        // 1. Limpiamos cualquier rastro previo
+        window.onpopstate = null;
+        
+        // 2. Creamos un punto de anclaje inicial
+        history.pushState({app: 'banano'}, '', window.location.pathname);
+
+        // 3. Sensor que atrapa el clic de 'Atrás'
+        window.onpopstate = function(event) {
+          // Bloqueo: evitamos que se salga de la página
+          history.pushState({app: 'banano'}, '', window.location.pathname);
+          // Avisamos a Shiny (usamos un número al azar para asegurar que el evento se dispare)
+          Shiny.setInputValue('ejecutar_retroceso', Math.random(), {priority: 'event'});
+        };
       ")
       
-      # B. REGISTRAR CADA CLIC EN EL MENÚ
+      # B. REGISTRO DE PESTAÑAS (Cuando el usuario hace clic)
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        # Guardamos la pestaña actual en nuestra lista de R
-        tmp <- cola_pestanas()
-        if (input$tabsid != tmp[length(tmp)]) {
-          cola_pestanas(c(tmp, input$tabsid))
+        # Guardamos la pestaña actual en la lista de R
+        lista_actual <- historial_pasos()
+        if (input$tabsid != lista_actual[length(lista_actual)]) {
+          historial_pasos(c(lista_actual, input$tabsid))
         }
       }, ignoreInit = TRUE)
       
-      # C. EJECUTAR EL RETROCESO REAL
-      observeEvent(input$presionaron_atras, {
-        pasos <- cola_pestanas()
+      # C. ACCIÓN DE RETROCEDER (Lo que mueve la pantalla)
+      observeEvent(input$ejecutar_retroceso, {
+        pasos <- historial_pasos()
         
         if (length(pasos) > 1) {
-          # 1. Quitamos la pestaña donde estamos ahora
+          # Eliminamos la pestaña donde estamos
           nueva_lista <- pasos[-length(pasos)]
-          # 2. Obtenemos la pestaña que estaba antes
-          pestaña_anterior <- nueva_lista[length(nueva_lista)]
+          # Obtenemos la anterior
+          pestaña_destino <- nueva_lista[length(nueva_lista)]
           
-          # 3. Actualizamos la memoria
-          cola_pestanas(nueva_lista)
+          # Actualizamos memoria y movemos la interfaz
+          historial_pasos(nueva_lista)
+          updateTabItems(session, "tabsid", pestaña_destino)
           
-          # 4. CAMBIAMOS LA PANTALLA
-          updateTabItems(session, "tabsid", pestaña_anterior)
+          # Notificación opcional para confirmar que funcionó (puedes borrarla luego)
+          showNotification(paste("Volviendo a:", pestaña_destino), duration = 2)
         }
       })
     }
