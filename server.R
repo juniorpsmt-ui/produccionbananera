@@ -265,31 +265,32 @@ server <- function(input, output, session) {
     # 2. Si el login fue exitoso, activamos el historial del navegador
     if (input$login_status == "SUCCESS") {
       
-      # 1. Creamos el punto de anclaje inicial con un Hash (#)
-      # Esto evita que el navegador intente buscar una página externa
+      # A. PUNTO DE INICIO (Evita que el botón esté gris al entrar)
       shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#home');")
       
-      # 2. Registramos cada cambio de pestaña usando el Hash (#)
+      # B. REGISTRO DE MOVIMIENTOS (Usa '#' para no salir de Posit)
       observeEvent(input$tabsid, {
         req(input$tabsid)
-        # El '#' le dice al navegador: "Quédate en esta aplicación"
         shinyjs::runjs(paste0(
           "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
         ))
       }, ignoreInit = TRUE)
       
-      # 3. Sensor que CAPTURA el botón de Windows antes de que te saque
+      # C. EL SENSOR ÚNICO (Captura el botón de Windows)
       shinyjs::runjs("
         window.onpopstate = function(event) {
           if (event.state && event.state.tab) {
-            Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+            Shiny.setInputValue('boton_atras_final', event.state.tab, {priority: 'event'});
+          } else {
+            // Si intenta ir más atrás de la cuenta, lo forzamos a quedarse en el home
+            Shiny.setInputValue('boton_atras_final', 'tab_enfunde_ingreso', {priority: 'event'});
           }
         };
       ")
       
-      # 4. Ejecutamos el cambio de pestaña internamente
-      observeEvent(input$boton_atras_windows, {
-        updateTabItems(session, "tabsid", input$boton_atras_windows)
+      # D. EL EJECUTOR (Mueve la pestaña)
+      observeEvent(input$boton_atras_final, {
+        updateTabItems(session, "tabsid", input$boton_atras_final)
       })
     }
   })
@@ -312,35 +313,35 @@ server <- function(input, output, session) {
   
   ############################################################
   
-  # --- DENTRO DEL BLOQUE DE LOGIN EXITOSO ---
-  
-  # 1. FORZAR AL NAVEGADOR A REGISTRAR CADA CLIC (Habilita las flechas de Windows)
-  observeEvent(input$tabsid, {
-    req(input$tabsid)
-    # Esta línea envía la orden directa al historial del navegador
-    shinyjs::runjs(paste0(
-      "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
-    ))
-  }, ignoreInit = TRUE)
-  
-  # 2. SENSOR PARA EL BOTÓN "ATRÁS" FÍSICO
-  shinyjs::runjs("
-   window.onpopstate = function(event) {
-          if (event.state && event.state.tab) {
-            // Avisamos a Shiny qué pestaña activar
-            Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
-          } else {
-            // Si el usuario insiste en ir atrás y no hay rastro, lo mandamos al inicio del dashboard
-            Shiny.setInputValue('boton_atras_windows', 'tab_enfunde_ingreso', {priority: 'event'});
-          }
-        };
-      ")
-  
-  # 3. ACCIÓN DE RETROCEDER PESTAÑA
-  observeEvent(input$navegar_atras_windows, {
-    updateTabItems(session, "tabsid", input$navegar_atras_windows)
-  })
-  
+  # # --- DENTRO DEL BLOQUE DE LOGIN EXITOSO ---
+  # 
+  # # 1. FORZAR AL NAVEGADOR A REGISTRAR CADA CLIC (Habilita las flechas de Windows)
+  # observeEvent(input$tabsid, {
+  #   req(input$tabsid)
+  #   # Esta línea envía la orden directa al historial del navegador
+  #   shinyjs::runjs(paste0(
+  #     "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
+  #   ))
+  # }, ignoreInit = TRUE)
+  # 
+  # # 2. SENSOR PARA EL BOTÓN "ATRÁS" FÍSICO
+  # shinyjs::runjs("
+  #  window.onpopstate = function(event) {
+  #         if (event.state && event.state.tab) {
+  #           // Avisamos a Shiny qué pestaña activar
+  #           Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+  #         } else {
+  #           // Si el usuario insiste en ir atrás y no hay rastro, lo mandamos al inicio del dashboard
+  #           Shiny.setInputValue('boton_atras_windows', 'tab_enfunde_ingreso', {priority: 'event'});
+  #         }
+  #       };
+  #     ")
+  # 
+  # # 3. ACCIÓN DE RETROCEDER PESTAÑA
+  # observeEvent(input$navegar_atras_windows, {
+  #   updateTabItems(session, "tabsid", input$navegar_atras_windows)
+  # })
+  # 
  
   ############################################################
   
