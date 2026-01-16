@@ -278,16 +278,19 @@ server <- function(input, output, session) {
       
       # C. EL SENSOR ÚNICO (Captura el botón de Windows)
       shinyjs::runjs("
+      // 1. Forzamos un estado inicial para que siempre haya un 'atrás' que capturar
+        history.pushState(null, null, window.location.href);
+
         window.onpopstate = function(event) {
+          // 2. Bloqueamos que el navegador se vaya a Google
+          history.pushState(null, null, window.location.href);
+          
+          // 3. Si hay una pestaña guardada, la activamos
           if (event.state && event.state.tab) {
-            Shiny.setInputValue('boton_atras_final', event.state.tab, {priority: 'event'});
-          } else {
-            // Si intenta ir más atrás de la cuenta, lo forzamos a quedarse en el home
-            Shiny.setInputValue('boton_atras_final', 'tab_enfunde_ingreso', {priority: 'event'});
+            Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
           }
         };
       ")
-      
       # D. EL EJECUTOR (Mueve la pestaña)
       observeEvent(input$boton_atras_final, {
         updateTabItems(session, "tabsid", input$boton_atras_final)
