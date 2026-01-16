@@ -240,20 +240,20 @@ server <- function(input, output, session) {
   })
   
   ##############################
-  
-  shinyjs::runjs("
-    window.onpopstate = function(event) {
-      if (event.state && event.state.tab) {
-        Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
-      }
-    };
-  ")
-  
-  observeEvent(input$boton_atras_windows, {
-    updateTabItems(session, "tabsid", input$boton_atras_windows)
-  })
-  
-  
+  # 
+  # shinyjs::runjs("
+  #   window.onpopstate = function(event) {
+  #     if (event.state && event.state.tab) {
+  #       Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+  #     }
+  #   };
+  # ")
+  # 
+  # observeEvent(input$boton_atras_windows, {
+  #   updateTabItems(session, "tabsid", input$boton_atras_windows)
+  # })
+  # 
+  # 
   ##############################
   
   
@@ -265,23 +265,42 @@ server <- function(input, output, session) {
     # 2. Si el login fue exitoso, activamos el historial del navegador
     if (input$login_status == "SUCCESS") {
       
-      # Agregamos un delay de medio segundo (500ms) para que la UI cargue primero
-      shinyjs::delay(500, {
-        shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '');")
-      })
+      # 1. Creamos el punto de anclaje inicial con un Hash (#)
+      # Esto evita que el navegador intente buscar una página externa
+      shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#home');")
       
-      # Código para que Windows habilite las flechas azul de "Atrás"
+      # 2. Registramos cada cambio de pestaña usando el Hash (#)
       observeEvent(input$tabsid, {
         req(input$tabsid)
+        # El '#' le dice al navegador: "Quédate en esta aplicación"
         shinyjs::runjs(paste0(
           "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
         ))
       }, ignoreInit = TRUE)
       
-  
-    
+      # 3. Sensor que CAPTURA el botón de Windows antes de que te saque
+      shinyjs::runjs("
+        window.onpopstate = function(event) {
+          if (event.state && event.state.tab) {
+            Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
+          }
+        };
+      ")
+      
+      # 4. Ejecutamos el cambio de pestaña internamente
+      observeEvent(input$boton_atras_windows, {
+        updateTabItems(session, "tabsid", input$boton_atras_windows)
+      })
     }
   })
+  
+  
+  
+  
+  
+  ########################################
+  
+  
   
   observeEvent(input$logout_btn, {
     # 1. Ejecutar el sign out de Firebase
