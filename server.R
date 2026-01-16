@@ -251,57 +251,75 @@ server <- function(input, output, session) {
   # 
   # 
   ##############################
-  # MEMORIA DE NAVEGACIÓN GLOBAL (Poner al inicio del server)
-  cola_navegacion <- reactiveVal(c("tab_enfunde_ingreso"))
+  # MEMORIA DE NAVEGACIÓN (Colocar al inicio, fuera de cualquier observe)
+  cola_pestanas <- reactiveVal(c("tab_enfunde_ingreso"))
   
     ########################
   
   observeEvent(input$login_status, {
-    if (input$login_status == "SUCCESS"){
-    
-        
-        # A. ACTIVAR SENSOR (JavaScript que no rompe la sesión)
-        shinyjs::runjs("
-        (function() {
-          // Crea un punto falso para que Chrome no se salga de la App
-          history.pushState(null, null, location.href);
-          
-          window.onpopstate = function() {
-            // Empuja de nuevo para bloquear la salida a Google
-            history.pushState(null, null, location.href);
-            // Envía la señal a Shiny
-            Shiny.setInputValue('disparar_retroceso', Math.random(), {priority: 'event'});
-          };
-        })();
-      ")
-        
-        # B. REGISTRAR MOVIMIENTOS EN EL MENÚ
-        observeEvent(input$tabsid, {
-          req(input$tabsid)
-          tmp <- cola_navegacion()
-          # Si la pestaña es nueva, la guardamos en la lista
-          if (input$tabsid != tmp[length(tmp)]) {
-            cola_navegacion(c(tmp, input$tabsid))
-          }
-        }, ignoreInit = TRUE)
-        
-        # C. EJECUTAR EL CAMBIO DE PESTAÑA
-        observeEvent(input$disparar_retroceso, {
-          pasos <- cola_navegacion()
-          if (length(pasos) > 1) {
-            # Borramos la actual y buscamos la anterior
-            nueva_lista <- pasos[-length(pasos)]
-            anterior <- nueva_lista[length(nueva_lista)]
-            
-            # Actualizamos memoria y movemos el formulario
-            cola_navegacion(nueva_lista)
-            updateTabItems(session, "tabsid", anterior)
-          }
-        })
-      }
-    })
+    if (input$login_status == "SUCCESS") {
+      # 1. Ocultar login y mostrar la App
+      shinyjs::hide("login_panel")
+      
+      # 2. Solo notificamos el éxito
+      showNotification("Acceso concedido", type = "message")
+    }
+  })
   
   #######################################
+  
+  # ESTE BLOQUE SE ACTIVA SOLO CUANDO EL MENÚ APARECE EN PANTALLA
+  observeEvent(input$tabsid, {
+    # req() detiene la ejecución hasta que 'tabsid' sea real en la UI
+    req(input$tabsid)
+    
+    # A. CONFIGURAR EL SENSOR (Solo la primera vez que aparece el menú)
+    shinyjs::runjs("
+      if (typeof window.navegacionLista === 'undefined') {
+        window.navegacionLista = true;
+        
+        // Punto inicial en el historial
+        history.pushState({tab: 'tab_enfunde_ingreso'}, '', location.href);
+        
+        window.onpopstate = function(event) {
+          // Bloqueo para que no se vaya a Google
+          history.pushState(null, null, location.href);
+          
+          if (event.state && event.state.tab) {
+            // Enviamos la señal de retroceso a Shiny
+            Shiny.setInputValue('retroceder_desde_sensor', event.state.tab, {priority: 'event'});
+          }
+        };
+      }
+    ")
+    
+    # B. REGISTRAR CADA CAMBIO DE PESTAÑA
+    tmp <- cola_pestanas()
+    if (input$tabsid != tmp[length(tmp)]) {
+      cola_pestanas(c(tmp, input$tabsid))
+      # Guardamos el movimiento en el historial del navegador
+      shinyjs::runjs(paste0("history.pushState({tab: '", input$tabsid, "'}, '', location.href);"))
+    }
+  }, ignoreInit = TRUE)
+  
+  # C. EJECUTAR EL RETROCESO
+  observeEvent(input$retroceder_desde_sensor, {
+    req(input$retroceder_desde_sensor)
+    # Movemos el menú lateral a la pestaña guardada
+    updateTabItems(session, "tabsid", input$retroceder_desde_sensor)
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  ####################################
+  
+  
+  
   
   # # 1. SENSOR SIEMPRE ACTIVO (Fuera del login)
   # shinyjs::runjs("
