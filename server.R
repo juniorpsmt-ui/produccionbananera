@@ -251,40 +251,55 @@ server <- function(input, output, session) {
   # 
   # 
   ##############################
-  # Historial interno de R (para control de seguridad)
-  historial_navegacion <- reactiveVal(c("tab_enfunde_ingreso"))
-  
-  
+  # MEMORIA DE NAVEGACIÓN GLOBAL (Poner al inicio del server)
+  cola_navegacion <- reactiveVal(c("tab_enfunde_ingreso"))
   
     ########################
   
   observeEvent(input$login_status, {
     if (input$login_status == "SUCCESS"){
-      
-      # 1. CÓDIGO JS MÍNIMO (Solo para activar la flecha del navegador)
-      shinyjs::runjs("
-        // Cada vez que cambie la pestaña, actualizamos la URL con un '#'
-        // Esto NO recarga la página, así que Posit Connect no te botará.
-        $(document).on('shiny:inputchanged', function(event) {
-          if (event.name === 'tabsid') {
-            history.pushState({tab: event.value}, '', '#' + event.value);
-          }
-        });
-
-        // Este es el sensor del botón 'Atrás' de Windows/Chrome
-        window.onpopstate = function(event) {
-          if (event.state && event.state.tab) {
-            Shiny.setInputValue('tabsid', event.state.tab);
-          }
-        };
+    
+        
+        # A. ACTIVAR SENSOR (JavaScript que no rompe la sesión)
+        shinyjs::runjs("
+        (function() {
+          // Crea un punto falso para que Chrome no se salga de la App
+          history.pushState(null, null, location.href);
+          
+          window.onpopstate = function() {
+            // Empuja de nuevo para bloquear la salida a Google
+            history.pushState(null, null, location.href);
+            // Envía la señal a Shiny
+            Shiny.setInputValue('disparar_retroceso', Math.random(), {priority: 'event'});
+          };
+        })();
       ")
-      
-      # 2. REFUERZO EN R (Para asegurar que la pestaña cambie)
-      observeEvent(input$tabsid, {
-        updateTabItems(session, "tabsid", input$tabsid)
-      })
-    }
-  })
+        
+        # B. REGISTRAR MOVIMIENTOS EN EL MENÚ
+        observeEvent(input$tabsid, {
+          req(input$tabsid)
+          tmp <- cola_navegacion()
+          # Si la pestaña es nueva, la guardamos en la lista
+          if (input$tabsid != tmp[length(tmp)]) {
+            cola_navegacion(c(tmp, input$tabsid))
+          }
+        }, ignoreInit = TRUE)
+        
+        # C. EJECUTAR EL CAMBIO DE PESTAÑA
+        observeEvent(input$disparar_retroceso, {
+          pasos <- cola_navegacion()
+          if (length(pasos) > 1) {
+            # Borramos la actual y buscamos la anterior
+            nueva_lista <- pasos[-length(pasos)]
+            anterior <- nueva_lista[length(nueva_lista)]
+            
+            # Actualizamos memoria y movemos el formulario
+            cola_navegacion(nueva_lista)
+            updateTabItems(session, "tabsid", anterior)
+          }
+        })
+      }
+    })
   
   #######################################
   
