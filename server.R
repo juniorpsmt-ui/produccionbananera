@@ -261,19 +261,55 @@ server <- function(input, output, session) {
     # 2. Si el login fue exitoso, activamos el historial del navegador
     if (input$login_status == "SUCCESS"){
       
-      # Creamos el anclaje inicial para que la flecha se ponga azul
-      # Usamos window.location.pathname para que Posit Connect no se salga del link oficial
-      shinyjs::runjs("history.replaceState({tab: 'tab_enfunde_ingreso'}, '', window.location.pathname);")
+      # A. INICIALIZACIÓN: Creamos un punto de retorno falso
+      # Esto hace que la flecha se ponga azul pero no cambie la URL real
+      shinyjs::runjs("
+        history.pushState({tab: 'tab_enfunde_ingreso'}, '', window.location.href);
+
+        window.onpopstate = function(event) {
+          // BLOQUEO DE SALIDA: Si el navegador intenta irse, lo obligamos a quedarse
+          history.pushState({tab: 'tab_enfunde_ingreso'}, '', window.location.href);
+          
+          if (event.state && event.state.tab) {
+            // Mandamos la orden a Shiny
+            Shiny.setInputValue('retroceder_real', event.state.tab, {priority: 'event'});
+          }
+        };
+      ")
       
-      # Registramos cada cambio de pestaña
+      # B. SEGUIMIENTO: Cada vez que el usuario haga clic en una pestaña
       observeEvent(input$tabsid, {
         req(input$tabsid)
+        # Guardamos la pestaña en el historial invisible
         shinyjs::runjs(paste0(
-          "history.pushState({tab: '", input$tabsid, "'}, '', window.location.pathname);"
+          "history.pushState({tab: '", input$tabsid, "'}, '', window.location.href);"
         ))
       }, ignoreInit = TRUE)
+      
+      # C. ACCIÓN: Mover la pestaña en la pantalla
+      observeEvent(input$retroceder_real, {
+        updateTabItems(session, "tabsid", input$retroceder_real)
+      })
     }
   })
+  
+  
+  #######################################
+  
+  # # 1. SENSOR SIEMPRE ACTIVO (Fuera del login)
+  # shinyjs::runjs("
+  #   window.onpopstate = function(event) {
+  #     if (event.state && event.state.tab) {
+  #       Shiny.setInputValue('retroceder_definitivo', event.state.tab, {priority: 'event'});
+  #     }
+  #   };
+  # ")
+  # 
+  # # 2. EJECUTOR SIEMPRE ACTIVO
+  # observeEvent(input$retroceder_definitivo, {
+  #   updateTabItems(session, "tabsid", input$retroceder_definitivo)
+  # })
+  #####################################
   
   
   
@@ -293,25 +329,7 @@ server <- function(input, output, session) {
   
   ############################################################
   
-  #######################################
-  
-  # 1. SENSOR SIEMPRE ACTIVO (Fuera del login)
-  shinyjs::runjs("
-    window.onpopstate = function(event) {
-      if (event.state && event.state.tab) {
-        Shiny.setInputValue('retroceder_definitivo', event.state.tab, {priority: 'event'});
-      }
-    };
-  ")
-  
-  # 2. EJECUTOR SIEMPRE ACTIVO
-  observeEvent(input$retroceder_definitivo, {
-    updateTabItems(session, "tabsid", input$retroceder_definitivo)
-  })
-  #####################################
-  
-  
-  
+
   
   
   
