@@ -956,23 +956,29 @@ server <- function(input, output, session) {
     # 🌟 NUEVA LÓGICA DE NAVEGACIÓN (INYECTADA AQUÍ)
     # ==========================================================
     shinyjs::runjs("
-      // 1. Evitamos duplicados y marcamos el inicio
-      $(document).off('click', '.sidebar-menu a'); 
-      history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#tab_enfunde_ingreso');
+     // 1. VARIABLE DE CONTROL: Para saber si el clic es automático o del usuario
+      window.navegandoAtras = false;
 
-      // 2. Escuchamos el clic en el menú (el Slider)
-      $(document).on('click', '.sidebar-menu a', function() {
+      $(document).off('click', '.sidebar-menu a').on('click', '.sidebar-menu a', function(e) {
         var tab = $(this).attr('data-value');
-        if(tab) {
+        
+        // Si el clic es del usuario (NO es navegando atrás), guardamos en el historial
+        if(!window.navegandoAtras && tab) {
           history.pushState({tab: tab}, '', '#' + tab);
         }
+        // Reseteamos la bandera siempre
+        window.navegandoAtras = false;
       });
 
-      // 3. Sensor del botón 'Atrás'
+      // 2. SENSOR DEL BOTÓN ATRÁS
       window.onpopstate = function(event) {
         if(event.state && event.state.tab) {
-          // Movemos el slider visualmente
+          // ACTIVAMOS LA LLAVE: Avisamos que este clic es automático
+          window.navegandoAtras = true;
+          
+          // Movemos el slider
           $('.sidebar-menu a[data-value=\"' + event.state.tab + '\"]').click();
+          
           // Sincronizamos con Shiny
           Shiny.setInputValue('tabsid', event.state.tab);
         }
