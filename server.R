@@ -49,7 +49,7 @@ tryCatch({
 server <- function(input, output, session) {
   
   
-
+  
   
   user_email_js <- reactiveVal(NULL)
   
@@ -236,45 +236,9 @@ server <- function(input, output, session) {
   })
   
   ##############################
-  # 
-  # shinyjs::runjs("
-  #   window.onpopstate = function(event) {
-  #     if (event.state && event.state.tab) {
-  #       Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
-  #     }
-  #   };
-  # ")
-  # 
-  # observeEvent(input$boton_atras_windows, {
-  #   updateTabItems(session, "tabsid", input$boton_atras_windows)
-  # })
-  # 
-  # 
-  ##############################
 
-    ########################
+  ##############################
   
-  # observeEvent(input$login_status, {
-  #   if (input$login_status == "SUCCESS") {
-  #     shinyjs::hide("login_panel")
-  #     
-  #     # Activamos el sensor de Windows una sola vez al entrar
-  #     shinyjs::runjs("
-  #       history.pushState({tab: 'tab_enfunde_ingreso'}, '', location.href);
-  #       window.onpopstate = function(event) {
-  #         if(event.state && event.state.tab) {
-  #           Shiny.setInputValue('navegar_atras_final', event.state.tab, {priority: 'event'});
-  #         }
-  #         history.pushState(null, null, location.href); // Bloqueo anti-Google
-  #       };
-  #     ")
-  #   }
-  # })
-  
-  
-  
-  
-  #######################################
   
   observeEvent(input$login_status, {
     showNotification(input$login_status, type = "error", duration = 5)
@@ -284,27 +248,9 @@ server <- function(input, output, session) {
   
   
   
+  #######################################
   
-  
-  
-  ####################################
-  
-  
-  
-  
-  # # 1. SENSOR SIEMPRE ACTIVO (Fuera del login)
-  # shinyjs::runjs("
-  #   window.onpopstate = function(event) {
-  #     if (event.state && event.state.tab) {
-  #       Shiny.setInputValue('retroceder_definitivo', event.state.tab, {priority: 'event'});
-  #     }
-  #   };
-  # ")
-  # 
-  # # 2. EJECUTOR SIEMPRE ACTIVO
-  # observeEvent(input$retroceder_definitivo, {
-  #   updateTabItems(session, "tabsid", input$retroceder_definitivo)
-  # })
+
   #####################################
   
   
@@ -325,41 +271,8 @@ server <- function(input, output, session) {
   
   ############################################################
   
-
   
   
-  
-  
-  # # --- DENTRO DEL BLOQUE DE LOGIN EXITOSO ---
-  # 
-  # # 1. FORZAR AL NAVEGADOR A REGISTRAR CADA CLIC (Habilita las flechas de Windows)
-  # observeEvent(input$tabsid, {
-  #   req(input$tabsid)
-  #   # Esta línea envía la orden directa al historial del navegador
-  #   shinyjs::runjs(paste0(
-  #     "history.pushState({tab: '", input$tabsid, "'}, '', '#", input$tabsid, "');"
-  #   ))
-  # }, ignoreInit = TRUE)
-  # 
-  # # 2. SENSOR PARA EL BOTÓN "ATRÁS" FÍSICO
-  # shinyjs::runjs("
-  #  window.onpopstate = function(event) {
-  #         if (event.state && event.state.tab) {
-  #           // Avisamos a Shiny qué pestaña activar
-  #           Shiny.setInputValue('boton_atras_windows', event.state.tab, {priority: 'event'});
-  #         } else {
-  #           // Si el usuario insiste en ir atrás y no hay rastro, lo mandamos al inicio del dashboard
-  #           Shiny.setInputValue('boton_atras_windows', 'tab_enfunde_ingreso', {priority: 'event'});
-  #         }
-  #       };
-  #     ")
-  # 
-  # # 3. ACCIÓN DE RETROCEDER PESTAÑA
-  # observeEvent(input$navegar_atras_windows, {
-  #   updateTabItems(session, "tabsid", input$navegar_atras_windows)
-  # })
-  # 
- 
   ############################################################
   
   # --- 4. MANEJADOR DEL BOTÓN DE LOGIN EN R (DEBE SER NUEVO) ---
@@ -672,7 +585,7 @@ server <- function(input, output, session) {
     
     
     
-
+    
     updateSelectInput(session, "filtro_semana_consulta", selected = sem_actual)
     
     
@@ -691,9 +604,9 @@ server <- function(input, output, session) {
     
     # Notificación de éxito para estar seguros
     showNotification("Registro guardado con éxito", type = "message", duration = 3)
-   
- 
-      } )
+    
+    
+  } )
   
   
   ######################################
@@ -951,7 +864,6 @@ server <- function(input, output, session) {
     
     
     
-    
     # ==========================================================
     # 🌟 NUEVA LÓGICA DE NAVEGACIÓN (INYECTADA AQUÍ)
     # ==========================================================
@@ -985,6 +897,7 @@ server <- function(input, output, session) {
       };
     ")
     # ==========================================================
+    
     
     
     
@@ -1032,17 +945,12 @@ server <- function(input, output, session) {
       
       
       dashboardBody(
-        
-        
-  #       tags$script(HTML("
-  #   $(document).on('click', '.sidebar-menu a', function() {
-  #     var tabName = $(this).attr('data-value');
-  #     Shiny.setInputValue('tabsid_manual', tabName);
-  #   });
-  # ")),
-        
-        
-        
+        tags$script(HTML("
+    $(document).on('click', '.sidebar-menu a', function() {
+      var tabName = $(this).attr('data-value');
+      Shiny.setInputValue('tabsid_manual', tabName);
+    });
+  ")),
         ###############################################################################
         shinyjs::useShinyjs(),
         
@@ -1472,29 +1380,6 @@ server <- function(input, output, session) {
   
   
   
-  
-  # 
-  # # --- LÓGICA PARA GENERAR EL FILTRO DE SEMANAS (Añadir a Server.R) ---
-  # output$ui_filtro_semana <- renderUI({
-  #   data <- datos_dashboard()
-  #   req(nrow(data) > 0)
-  #   
-  #   # Obtener todas las semanas únicas y ordenarlas
-  #   semanas <- unique(data$SEMANA_COSECHA)
-  #   semanas <- sort(semanas)
-  #   
-  #   # Opciones, incluyendo 'Todos'
-  #   opciones <- c("Todos", semanas)
-  #   
-  #   # Generar el control de selección
-  #   selectInput(
-  #     "filtro_semana", 
-  #     "Filtrar por Semana:", 
-  #     choices = opciones,
-  #     selected = "Todos"
-  #   )
-  # })
-  
   ##################################
   
   # --- LÓGICA PARA GENERAR EL FILTRO DE SEMANAS (MODIFICADO) ---
@@ -1567,8 +1452,7 @@ server <- function(input, output, session) {
   })
   
   
-  # --- LÓGICA PARA GENERAR EL FILTRO DE EMPRESAS (Solo si el usuario es SUPER_ADMIN) ---
-  
+ 
   
   # --- LÓGICA PARA GENERAR EL FILTRO DE EMPRESAS (Solo si el usuario es SUPER_ADMIN) ---
   output$ui_filtro_empresa <- renderUI({
@@ -1764,9 +1648,9 @@ server <- function(input, output, session) {
   
   
   
-    ##########################################################################################
+  ##########################################################################################
   
-output$tabla_ingresos_semanales <- DT::renderDataTable({
+  output$tabla_ingresos_semanales <- DT::renderDataTable({
     mis_lotes <- lotes_del_sector()
     req(mis_lotes)
     
@@ -1886,7 +1770,7 @@ output$tabla_ingresos_semanales <- DT::renderDataTable({
   
   
   
- 
+  
   
   
   
@@ -2237,49 +2121,7 @@ output$tabla_ingresos_semanales <- DT::renderDataTable({
   
   
   
-  # # --- VALIDACIÓN DINÁMICA DE SEMANAS EN EL REGISTRO ---
-  # observeEvent(input$enfunde_fecha, {
-  #   req(input$enfunde_fecha)
-  #   
-  #   # 1. Extraer el año de la fecha de registro seleccionada
-  #   ano_seleccionado <- as.numeric(format(input$enfunde_fecha, "%Y"))
-  #   
-  #   # 2. Definir el límite (2026 = 53, otros = 52)
-  #   max_semanas_registro <- if (ano_seleccionado == 2026) 53 else 52
-  #   
-  #   # 3. Actualizar el combo de entrada 'enfunde_semana'
-  #   updateSelectInput(session, "enfunde_semana",
-  #                     label = paste("Semana (Año", ano_seleccionado, "):"),
-  #                     choices = 1:max_semanas_registro,
-  #                     selected = input$enfunde_semana) # Mantiene la que estaba si es válida
-  # })
-  # 
   
-  # # --- ESTO VA EN EL SERVER.R ---
-  # observe({
-  #   # 1. Validamos que la fecha exista
-  #   req(input$enfunde_fecha)
-  #   
-  #   # 2. Extraemos el año de la fecha de registro
-  #   # format() nos da el año, as.numeric() lo vuelve número
-  #   anio_registro <- as.numeric(format(input$enfunde_fecha, "%Y"))
-  #   
-  #   # 3. Lógica del límite: 2026 tiene 53, los demás 52
-  #   max_permitido <- if (anio_registro == 2026) 53 else 52
-  #   
-  #   # DEBUG: Esto aparecerá en tu consola de RStudio para confirmar que funciona
-  #   #print(paste("Cambiando límites: Año", anio_registro, "- Max Semanas:", max_permitido))
-  #   
-  #   # 4. ACTUALIZACIÓN FORZOSA DEL COMBO
-  #   updateSelectInput(session, "enfunde_semana",
-  #                     choices = 1:max_permitido,
-  #                     selected = if(as.numeric(input$enfunde_semana) > max_permitido) 1 else input$enfunde_semana)
-  # })
-  # 
-  
-
-  
- 
   
   
 }
