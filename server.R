@@ -49,20 +49,7 @@ tryCatch({
 server <- function(input, output, session) {
   
   
-  # MEMORIA PERSISTENTE (No depende del Login ni del Menú)
-  historial <- reactiveVal("tab_enfunde_ingreso")
-  
-  
-  
-  # Función para capturar movimientos (La definimos una sola vez)
-  registrar_movimiento <- function(nueva_tab) {
-    tmp <- historial()
-    if (nueva_tab != tmp[length(tmp)]) {
-      historial(c(tmp, nueva_tab))
-    }
-  }
-  
-  
+
   
   user_email_js <- reactiveVal(NULL)
   
@@ -267,25 +254,33 @@ server <- function(input, output, session) {
 
     ########################
   
-  observeEvent(input$login_status, {
-    if (input$login_status == "SUCCESS") {
-      shinyjs::hide("login_panel")
-      
-      # Activamos el sensor de Windows una sola vez al entrar
-      shinyjs::runjs("
-        history.pushState({tab: 'tab_enfunde_ingreso'}, '', location.href);
-        window.onpopstate = function(event) {
-          if(event.state && event.state.tab) {
-            Shiny.setInputValue('navegar_atras_final', event.state.tab, {priority: 'event'});
-          }
-          history.pushState(null, null, location.href); // Bloqueo anti-Google
-        };
-      ")
-    }
-  })
+  # observeEvent(input$login_status, {
+  #   if (input$login_status == "SUCCESS") {
+  #     shinyjs::hide("login_panel")
+  #     
+  #     # Activamos el sensor de Windows una sola vez al entrar
+  #     shinyjs::runjs("
+  #       history.pushState({tab: 'tab_enfunde_ingreso'}, '', location.href);
+  #       window.onpopstate = function(event) {
+  #         if(event.state && event.state.tab) {
+  #           Shiny.setInputValue('navegar_atras_final', event.state.tab, {priority: 'event'});
+  #         }
+  #         history.pushState(null, null, location.href); // Bloqueo anti-Google
+  #       };
+  #     ")
+  #   }
+  # })
+  
+  
+  
+  
   #######################################
   
- 
+  observeEvent(input$login_status, {
+    showNotification(input$login_status, type = "error", duration = 5)
+  })
+  
+  
   
   
   
@@ -957,6 +952,35 @@ server <- function(input, output, session) {
     
     
     
+    # ==========================================================
+    # 🌟 NUEVA LÓGICA DE NAVEGACIÓN (INYECTADA AQUÍ)
+    # ==========================================================
+    shinyjs::runjs("
+      // 1. Evitamos duplicados y marcamos el inicio
+      $(document).off('click', '.sidebar-menu a'); 
+      history.replaceState({tab: 'tab_enfunde_ingreso'}, '', '#tab_enfunde_ingreso');
+
+      // 2. Escuchamos el clic en el menú (el Slider)
+      $(document).on('click', '.sidebar-menu a', function() {
+        var tab = $(this).attr('data-value');
+        if(tab) {
+          history.pushState({tab: tab}, '', '#' + tab);
+        }
+      });
+
+      // 3. Sensor del botón 'Atrás'
+      window.onpopstate = function(event) {
+        if(event.state && event.state.tab) {
+          // Movemos el slider visualmente
+          $('.sidebar-menu a[data-value=\"' + event.state.tab + '\"]').click();
+          // Sincronizamos con Shiny
+          Shiny.setInputValue('tabsid', event.state.tab);
+        }
+      };
+    ")
+    # ==========================================================
+    
+    
     
     
     
@@ -1002,12 +1026,17 @@ server <- function(input, output, session) {
       
       
       dashboardBody(
-        tags$script(HTML("
-    $(document).on('click', '.sidebar-menu a', function() {
-      var tabName = $(this).attr('data-value');
-      Shiny.setInputValue('tabsid_manual', tabName);
-    });
-  ")),
+        
+        
+  #       tags$script(HTML("
+  #   $(document).on('click', '.sidebar-menu a', function() {
+  #     var tabName = $(this).attr('data-value');
+  #     Shiny.setInputValue('tabsid_manual', tabName);
+  #   });
+  # ")),
+        
+        
+        
         ###############################################################################
         shinyjs::useShinyjs(),
         
@@ -2242,32 +2271,7 @@ output$tabla_ingresos_semanales <- DT::renderDataTable({
   # })
   # 
   
-  # 1. Vigila cuando el usuario cambia de pestaña manualmente
-  observe({
-    # req() CRÍTICO: Si el menú no existe (ej. antes del login), esto se detiene.
-    req(input$tabsid) 
-    
-    # Guardamos el movimiento en R
-    registrar_movimiento(input$tabsid)
-    
-    # Guardamos el movimiento en el Navegador
-    shinyjs::runjs(paste0("history.pushState({tab: '", input$tabsid, "'}, '', location.href);"))
-  })
-  
-  # 2. Ejecuta el retroceso cuando presionan el botón de Windows/Chrome
-  observeEvent(input$navegar_atras_final, {
-    req(input$tabsid) # Asegura que el menú está ahí para recibir la orden
-    
-    pasos <- historial()
-    if (length(pasos) > 1) {
-      nueva_lista <- pasos[-length(pasos)]
-      anterior <- nueva_lista[length(nueva_lista)]
-      
-      historial(nueva_lista) # Actualizamos memoria
-      updateTabItems(session, "tabsid", anterior) # Movemos el formulario
-    }
-  })
-  
+
   
  
   
