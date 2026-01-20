@@ -2054,16 +2054,29 @@ server <- function(input, output, session) {
     
     actual <- pestaña_activa()
     
+    # # LÓGICA DE VISIBILIDAD MEJORADA
+    # if (u$role == "JEFE_SECTOR" ) {
+    #   
+    #   
+    #   # BLOQUEO ESTRICTO: Solo si la variable dice 'tab_enfunde_ingreso'
+    #   # Como al iniciar la variable es "", esta condición NO se cumple y los filtros se muestran.
+    #   if (actual == "tab_enfunde_ingreso") {
+    #     return(NULL)
+    #   }
+    # }
+    
+    
+    
     # LÓGICA DE VISIBILIDAD MEJORADA
-    if (u$role == "JEFE_SECTOR") {
+    if (u$role == "JEFE_SECTOR" || u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
       
-      
-      # BLOQUEO ESTRICTO: Solo si la variable dice 'tab_enfunde_ingreso'
-      # Como al iniciar la variable es "", esta condición NO se cumple y los filtros se muestran.
+      # BLOQUEO ESTRICTO: Solo si la pestaña es 'tab_enfunde_ingreso'
       if (actual == "tab_enfunde_ingreso") {
         return(NULL)
       }
     }
+    
+    
     
     # Solo bloqueamos si estamos SEGUROS de que es la pestaña de ingreso.
     # Si el valor es "" o NULL (instancia inicial), permitimos que se vean 
