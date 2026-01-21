@@ -1520,8 +1520,24 @@ server <- function(input, output, session) {
             dateInput("enfunde_fecha", "Fecha de Registro", value = Sys.Date()),
             #numericInput("enfunde_semana", "Semana", value = as.numeric(format(Sys.Date(), "%W"))),
             selectInput("enfunde_semana", "Semana:", choices = 1:52, selected = 2),
-            selectInput("enfunde_hacienda", "Hacienda (RLS)", choices = form_data$haciendas),
-            selectInput("enfunde_lote", "Lote (RLS)", choices = form_data$lotes),
+            
+            
+            {
+              h_choices <- form_data$haciendas
+              if (user$role == "SUPER_ADMIN" || user$role == "ADMIN_EMPRESA") {
+                prioridad <- "SAN HUMBERTO"
+                if (prioridad %in% h_choices) {
+                  # Lo ponemos al inicio de la lista
+                  h_choices <- c(prioridad, setdiff(h_choices, prioridad))
+                }
+              }
+              selectInput("enfunde_hacienda", "Hacienda ", choices = h_choices)
+            },
+            
+            
+            
+            # selectInput("enfunde_hacienda", "Hacienda ", choices = form_data$haciendas),
+            selectInput("enfunde_lote", "Lote ", choices = form_data$lotes),
             selectInput("enfunde_cinta", "Color de Cinta", choices = form_data$cintas)
         ),
         
@@ -1539,7 +1555,7 @@ server <- function(input, output, session) {
             h4(paste("Jefe de Sector:", user$name)),
             h4(paste("Empresa ID:", user$empresa_id)),
             infoBoxOutput("kpi_enfunde_total", width = 12),
-            actionButton("enfunde_submit", "Guardar en Firebase", icon = icon("save"), 
+            actionButton("enfunde_submit", "Guardar Informacion de Enfunde", icon = icon("save"), 
                          class = "btn-success btn-lg", width = "100%"),
             br(), br(),
             textOutput("save_status_message")
@@ -1651,8 +1667,26 @@ server <- function(input, output, session) {
   ##########################################################################################
   
   output$tabla_ingresos_semanales <- DT::renderDataTable({
-    mis_lotes <- lotes_del_sector()
+
+    u <- user_info() # Obtenemos el usuario
+    
+    # MODIFICACIÓN AQUÍ:
+    # Si eres ADMIN, necesitamos TODOS los lotes de la hacienda seleccionada.
+    # Si eres JEFE, usas tu función normal.
+    if (u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
+      # Buscamos en los datos crudos todos los lotes únicos de la hacienda actual
+      df_lotes <- datos_banano_raw 
+      mis_lotes <- sort(unique(df_lotes$Lote)) 
+    } else {
+      mis_lotes <- lotes_del_sector()
+    }
+    
     req(mis_lotes)
+    
+    
+    
+    # mis_lotes <- lotes_del_sector()
+    # req(mis_lotes)
     
     # 1. Crear tabla molde
     tabla_final <- data.frame(
