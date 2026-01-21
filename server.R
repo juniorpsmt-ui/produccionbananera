@@ -1670,13 +1670,27 @@ server <- function(input, output, session) {
 
     u <- user_info() # Obtenemos el usuario
     
-    # MODIFICACIÓN AQUÍ:
-    # Si eres ADMIN, necesitamos TODOS los lotes de la hacienda seleccionada.
-    # Si eres JEFE, usas tu función normal.
+    # 1. Escuchamos qué hacienda está seleccionada en el combo que acabas de arreglar
+    hacienda_actual <- input$enfunde_hacienda 
+    req(hacienda_actual) 
+    
+    # 2. Generamos los lotes según el rol y la hacienda elegida
     if (u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
-      # Buscamos en los datos crudos todos los lotes únicos de la hacienda actual
-      df_lotes <- datos_banano_raw 
-      mis_lotes <- sort(unique(df_lotes$Lote)) 
+      # 1. Verificamos que el objeto exista
+      req(datos_banano_raw)
+      
+      # 2. Buscamos la columna sin importar si es Hacienda, hacienda o HACIENDA
+      # Usamos un filtro dinámico para evitar el error de 'object not found'
+      df_lotes <- datos_banano_raw
+      
+      # Forzamos los nombres a mayúsculas para comparar seguro
+      colnames(df_lotes) <- toupper(colnames(df_lotes))
+      
+      mis_lotes <- df_lotes %>% 
+        filter(HACIENDA == toupper(hacienda_actual)) %>% 
+        pull(LOTE) %>% 
+        unique() %>% 
+        sort()
     } else {
       mis_lotes <- lotes_del_sector()
     }
