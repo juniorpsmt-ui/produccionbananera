@@ -1514,32 +1514,72 @@ server <- function(input, output, session) {
     }
     
     fluidPage(
+      tagList( # <--- ESTO ES FUNDAMENTAL
+      # USAMOS tagList para que Shiny renderice todos los bloques if y fluidRows correctamente
+    
+        # BOTÓN SOLO PARA ADMINS
+        if (user$role == "SUPER_ADMIN" || user$role == "ADMIN_EMPRESA") {
+          fluidRow(
+            column(width = 12, align = "center",
+                   actionButton("btn_toggle_edicion", 
+                                if(mostrar_edicion_admin()) "Ocultar Formulario de Edición" else "Habilitar Edición de Enfunde",
+                                icon = icon(if(mostrar_edicion_admin()) "eye-slash" else "edit"),
+                                class = if(mostrar_edicion_admin()) "btn-danger" else "btn-info",
+                                style = "margin-bottom: 20px; width: 300px;")
+            )
+          )
+        },
+        
+      
       # PRIMER BLOQUE: FORMULARIO
-      fluidRow(
-        box(title = "Datos de Ubicación y Fecha", status = "primary", solidHeader = TRUE, width = 4,
-            dateInput("enfunde_fecha", "Fecha de Registro", value = Sys.Date()),
-            #numericInput("enfunde_semana", "Semana", value = as.numeric(format(Sys.Date(), "%W"))),
-            selectInput("enfunde_semana", "Semana:", choices = 1:52, selected = 2),
-            
-            
-            {
-              h_choices <- form_data$haciendas
-              if (user$role == "SUPER_ADMIN" || user$role == "ADMIN_EMPRESA") {
-                prioridad <- "SAN HUMBERTO"
-                if (prioridad %in% h_choices) {
-                  # Lo ponemos al inicio de la lista
-                  h_choices <- c(prioridad, setdiff(h_choices, prioridad))
-                }
-              }
-              selectInput("enfunde_hacienda", "Hacienda ", choices = h_choices)
-            },
-            
-            
-            
-            # selectInput("enfunde_hacienda", "Hacienda ", choices = form_data$haciendas),
-            selectInput("enfunde_lote", "Lote ", choices = form_data$lotes),
-            selectInput("enfunde_cinta", "Color de Cinta", choices = form_data$cintas)
-        ),
+ 
+  
+      if (user$role == "SUPER_ADMIN" || user$role == "ADMIN_EMPRESA") {
+        # --- VISTA HORIZONTAL PARA ADMIN ---
+        
+        
+        # VISTA PARA ADMIN: Una fila completa y delgada
+        fluidRow(
+          box(title = "Panel de Control (Admin)", status = "primary", solidHeader = TRUE, width = 12,
+              column(width = 2, dateInput("enfunde_fecha", "Fecha", value = Sys.Date(), width = "100%")),
+              column(width = 1, selectInput("enfunde_semana", "Sem.", choices = 1:52, selected = 2, width = "100%")),
+              column(width = 2, 
+                     selectInput("enfunde_hacienda", "Hacienda", 
+                                 choices = c("SAN HUMBERTO", setdiff(form_data$haciendas, "SAN HUMBERTO")), 
+                                 width = "100%")),
+              column(width = 2, selectInput("enfunde_lote", "Lote", choices = form_data$lotes, width = "100%")),
+              column(width = 2, selectInput("enfunde_cinta", "Cinta", choices = form_data$cintas, width = "100%")),
+              column(width = 3, br(), 
+                     actionButton("btn_toggle_edicion", 
+                                  if(mostrar_edicion_admin()) "Cerrar Edición" else "Habilitar Ingreso",
+                                  icon = icon(if(mostrar_edicion_admin()) "lock-open" else "lock"),
+                                  class = if(mostrar_edicion_admin()) "btn-danger" else "btn-warning",
+                                  width = "100%"))
+          )
+        )
+      } else {
+        # VISTA PARA JEFE: La fila que contiene los 3 boxes originales
+        
+        
+        if (user$role == "JEFE_SECTOR" || mostrar_edicion_admin()) {
+          # IMPORTANTE: Todo el contenido de abajo debe ir en un solo fluidRow 
+          # para que se alineen horizontalmente (4+4+4 = 12)
+          
+          
+        fluidRow(
+          
+          # 1. El box que ya tienes de Ubicación (solo para el Jefe)
+          if (user$role == "JEFE_SECTOR") {
+            box(title = "Datos de Ubicación y Fecha", status = "primary", solidHeader = TRUE, width = 4,
+                dateInput("enfunde_fecha", "Fecha de Registro", value = Sys.Date()),
+                selectInput("enfunde_semana", "Semana:", choices = 1:52, selected = 2),
+                selectInput("enfunde_hacienda", "Hacienda ", choices = form_data$haciendas),
+                selectInput("enfunde_lote", "Lote ", choices = form_data$lotes),
+                selectInput("enfunde_cinta", "Color de Cinta", choices = form_data$cintas)
+            )
+          },
+  
+          # 2. Box de Racimos
         
         box(title = "Racimos Enfundados", status = "warning", solidHeader = TRUE, width = 4,
             numericInput("enfunde_lun", "Lunes", value = 0, min = 0),
@@ -1550,7 +1590,7 @@ server <- function(input, output, session) {
             numericInput("enfunde_sab", "Sábado", value = 0, min = 0),
             numericInput("enfunde_dom", "Domingo", value = 0, min = 0)
         ),
-        
+        # 3. Box de Resumen
         box(title = "Resumen y Envío", status = "success", solidHeader = TRUE, width = 4,
             h4(paste("Jefe de Sector:", user$name)),
             h4(paste("Empresa ID:", user$empresa_id)),
@@ -1560,27 +1600,47 @@ server <- function(input, output, session) {
             br(), br(),
             textOutput("save_status_message")
         )
-      ), # <--- ESTA COMA ES OBLIGATORIA PARA SEPARAR LOS FLUIDROW
+        
+          )
+        }
+      },
+      # Cierre del fluidRow de arriba
+ 
+ 
+ 
+ 
+      ##################################
+
+     
+      #############################
+      
+      
+      
+      
+      
       
       # SEGUNDO BLOQUE: LISTADO/TABLA
       fluidRow(
-        box(
-          title = "Listado de Lotes y Registros Semanales", 
-          status = "primary", # Cambiado a primary para que resalte
-          solidHeader = TRUE, 
-          width = 12,
-          column(width = 12,
-                 div(style = "display: inline-block; vertical-align:top; width: 250px;",
-                     selectInput("filtro_semana_consulta", "Ver Historial (Semana):",
-                                 choices = 1:52, # Esto se actualizará solo
-                                 selected = 2)),
-                 hr(),
-                 # Contenedor para la tabla
-                 DT::dataTableOutput("tabla_ingresos_semanales")
-          )
+          box(
+            title = "Listado de Lotes y Registros Semanales", 
+            status = "primary", # Cambiado a primary para que resalte
+            solidHeader = TRUE, 
+            width = 12,
+            column(width = 12,
+                   div(style = "display: inline-block; vertical-align:top; width: 250px;",
+                       selectInput("filtro_semana_consulta", "Ver Historial (Semana):",
+                                   choices = 1:52, # Esto se actualizará solo
+                                   selected = 2)),
+                   hr(),
+                   # Contenedor para la tabla
+                   DT::dataTableOutput("tabla_ingresos_semanales")
+            )
         )
       )
+ 
+      )
     )
+ 
   })
   
   
@@ -1592,8 +1652,17 @@ server <- function(input, output, session) {
   # --- 11. RECEPTOR DE DATOS DESDE FIREBASE ---
   datos_semanales_firebase <- reactiveVal(NULL)
   
+  
   valores_tabla_actual <- reactiveVal(NULL)
   
+  # Variable para controlar si el Admin puede ver el formulario de edición
+  
+  mostrar_edicion_admin <- reactiveVal(FALSE)
+  
+  
+  
+  
+  ######################################################
   
   
   observeEvent(input$datos_desde_firestore, {
@@ -2179,9 +2248,26 @@ server <- function(input, output, session) {
   })
   
   
+  #### este es boton para el adminidtardor cuando ingrese al dashboard enfunde 
+  observeEvent(input$btn_toggle_edicion, {
+    # Cambia de TRUE a FALSE y viceversa
+    mostrar_edicion_admin(!mostrar_edicion_admin())
+  })
   
+  ###################################
+  #esto es para en input de color de cinta segun la semana 
+  # 1. Definimos la secuencia (el orden que me diste)
+  secuencia_cintas <- c("VERDE", "AZUL", "BLANCA", "NEGRA", "LILA", "ROJA", "CAFE", "AMARILLA")
   
+  # 2. Lógica para determinar el color según la semana
+  # Se usa (semana - 1) %% 8 + 1 para que rote cada 8 semanas
+  color_sugerido <- reactive({
+    sem <- as.numeric(input$enfunde_semana)
+    indice <- ((sem - 1) %% 8) + 1
+    return(secuencia_cintas[indice])
+  })
   
+  ###############################################
   
   
   
