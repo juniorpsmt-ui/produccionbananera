@@ -12,6 +12,19 @@ library(tibble) # Necesario para crear tibbles de emergencia
 library(data.table)
 library(lubridate)
 
+
+
+
+# --- CARGA DE DATOS MAESTROS ---
+# Nota: Ajusta las rutas si los archivos están dentro de una carpeta específica
+trabajadores <- read_excel("LABORES AGRICOLAS/LISTADO TRABAJADORES AGRICOLAS.xlsx")
+tarifario    <- read_excel("LABORES AGRICOLAS/TARIFARIO 2026.xlsx")
+lotes        <- read_excel("LABORES AGRICOLAS/LOTESH.xlsx")
+
+# View(trabajadores)
+# View(tarifario)
+# View(lotes )
+
 # Al inicio de tu archivo
 if (!require("data.table")) install.packages("data.table")
 library(data.table)
@@ -929,6 +942,8 @@ server <- function(input, output, session) {
           # 🌟 NUEVO MENU: ENFUNDE
           menuItem("🏷️ Enfunde", tabName = "tab_enfunde_ingreso", icon = icon("tag") ),
           
+          menuItem("Reporte Labores Agrícolas", tabName = "labores_reporte", icon = icon("file-invoice-dollar")),
+          
           menuItem("❌ Tasa de Rechazo", tabName = "tab_rechazo", icon = icon("times")),
           menuItem("🔬 Optimización por Edad", tabName = "tab_edad", icon = icon("leaf")),
           menuItem("🔬 Estimacion de Produccion", tabName = "tab_Estimacion", icon = icon("leaf")),
@@ -956,10 +971,49 @@ server <- function(input, output, session) {
         
         
         # *** ESTILOS CSS PARA COMPACTAR LA UI ***
+        
+        
+        ###############
+        
         tags$head(
-          
-          
-          
+          tags$style(HTML("
+    /* Dibujar bordes en todas las celdas de la tabla de ingreso */
+    #tabla_ingreso_avance table.dataTable td {
+      border: 1px solid #d1d1d1 !important;
+      padding: 5px !important;
+    }
+    
+    /* Resaltar la celda donde el mouse está encima */
+    #tabla_ingreso_avance table.dataTable td:hover {
+      background-color: #f1f1f1 !important;
+      cursor: cell;
+    }
+    
+    /* Estilo para que la columna de observaciones sea más ancha y tenga bordes */
+#tabla_ingreso_avance table.dataTable td:last-child {
+  min-width: 200px !important;
+  background-color: #ffffff !important;
+}
+
+    /* Línea gruesa para separar a cada trabajador (cada 2 filas) */
+    #tabla_ingreso_avance table.dataTable tr:nth-child(even) td {
+      border-bottom: 2.5px solid #444 !important;
+    }
+
+    /* Color de fondo para las columnas de Nombres para que no se confundan */
+    #tabla_ingreso_avance table.dataTable td:first-child {
+      background-color: #f9f9f9;
+      font-weight: bold;
+    }
+  "))
+        ),
+        
+        
+        
+        
+        ###########
+        
+        tags$head(
           tags$style(HTML("
           /* Bloqueo total al cargar la página */
    /* .bloqueado-inicial { display: none !important; }   */
@@ -1130,13 +1184,46 @@ server <- function(input, output, session) {
           
           
           
+          
+          
+          
+          #este tab item esta suelto
+          
           # 🌟 NUEVO TABITEM: Análisis de Enfunde (Vacío por ahora)
           tabItem(tabName = "tab_enfunde_analisis",
                   h2("📈 Análisis de Enfunde (KPIs y Tendencias)")
           ),
           
+          ##########################
           
+          tabItem(tabName = "labores_reporte",
+                  fluidRow(
+                    column(12, h2("Seleccione Labor para Ingreso", " - dar click en el nombre de la labor" ), br())
+                  ),
+                  
+                  # FILA DE BOTONES DE ACCESO
+                  fluidRow(
+                    column(3, actionButton("btn_enfundadores", 
+                                           label = div(icon("user-check", "fa-3x"), br(), "ENFUNDADORES"),
+                                           style = "width:100%; height:120px; background-color: #007bff; color: white; font-size: 18px; font-weight: bold;")),
+                    column(3, actionButton("btn_deshojadores", 
+                                           label = div(icon("leaf", "fa-3x"), br(), "DESHOJADORES"),
+                                           style = "width:100%; height:120px; background-color: #28a745; color: white; font-size: 18px; font-weight: bold;")),
+                    column(3, actionButton("btn_enzunchadores", 
+                                           label = div(icon("link", "fa-3x"), br(), "ENZUNCHADORES"),
+                                           style = "width:100%; height:120px; background-color: #ffc107; color: black; font-size: 18px; font-weight: bold;")),
+                    column(3, actionButton("btn_deschantadores", 
+                                           label = div(icon("broom", "fa-3x"), br(), "DESCHANTADORES"),
+                                           style = "width:100%; height:120px; background-color: #17a2b8; color: white; font-size: 18px; font-weight: bold;"))
+                  ),
+                  
+                  hr(),
+                  
+                  # AQUÍ APARECERÁ EL FORMULARIO DESPUÉS DE DAR CLIC
+                  uiOutput("formulario_labor_dinamico")
+          ),
           
+          ##########################################
           
           # 2. Pestaña de Tasa de Rechazo (El tabItem original)
           tabItem(tabName = "tab_rechazo",
@@ -2227,7 +2314,7 @@ server <- function(input, output, session) {
     if (u$role == "JEFE_SECTOR" || u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
       
       # BLOQUEO ESTRICTO: Solo si la pestaña es 'tab_enfunde_ingreso'
-      if (actual == "tab_enfunde_ingreso") {
+      if (actual == "tab_enfunde_ingreso"|| actual == "labores_reporte" ) {
         return(NULL)
       }
     }
@@ -2335,6 +2422,210 @@ server <- function(input, output, session) {
                         if(color_actual == "BLANCA") "black" else color_actual),
          paste("Cinta:", color_actual))
   })
+  
+  
+  ##################
+  #ESTA CODIFICACION ES PARA INGRESO DE LABORES AGRICOLAS 
+  
+  # 1. Variable para guardar qué labor se seleccionó
+  labor_activa <- reactiveVal(NULL)
+  
+  # 2. Eventos para cada botón
+  observeEvent(input$btn_enfundadores, { labor_activa("ENFUNDADOR") })
+  observeEvent(input$btn_deshojadores, { labor_activa("DESHOJADORES") })
+  observeEvent(input$btn_enzunchadores, { labor_activa("ENZUNCHADOR") })
+  observeEvent(input$btn_deschantadores, { labor_activa("DESCHANTADOR") })
+  
+  # 3. Formulario Dinámico (Paso 5)
+  output$formulario_labor_dinamico <- renderUI({
+    req(labor_activa()) # Solo se muestra si han dado clic en un botón
+    
+    # Filtramos los trabajadores según el botón presionado
+    # Usamos el archivo 'trabajadores' que cargamos antes
+    empleados_filtrados <- trabajadores %>% 
+      filter(ACTIVIDAD == labor_activa())
+    
+    box(
+      title = paste("Registro Diario para:", labor_activa()),
+      status = "primary", solidHeader = TRUE, width = 12,
+      
+      fluidRow(
+        column(4, selectInput("labor_lote", "Seleccione Lote:", choices = unique(lotes$LOTE))),
+        column(4, dateInput("labor_fecha", "Fecha de Labor:", value = Sys.Date()))
+       
+      ),
+      
+      hr(),
+      
+      # Dentro de tu renderUI del formulario, antes de la tabla:
+      fluidRow(
+        column(6, helpText("Instrucciones: Haga doble clic en una celda para ingresar datos. 
+                     Use el código del tarifario (ej: 700015 para Deshoje).")),
+        column(6, align = "right", actionButton("guardar_labores", "Guardar Reporte Semanal", 
+                                                icon = icon("save"), class = "btn-success"))
+      ),
+      
+      h4("Lista de Personal:"),
+      # Aquí es donde pondremos la tabla de ingreso
+      DTOutput("tabla_ingreso_avance")
+    )
+  })
+  
+  
+  #########2 da parte ojo 
+  
+  # Función para crear la estructura de la tabla "vacía" para la semana
+  crear_matriz_ingreso <- function(lista_nombres) {
+    # Duplicamos cada nombre de la lista (1, 1, 2, 2, 3, 3...)
+    nombres_duplicados <- rep(lista_nombres, each = 2)
+    
+    df <- data.frame(
+      TRABAJADOR = nombres_duplicados,
+      # Creamos las 18 columnas (6 días x 3 campos) inicializadas vacías o en 0
+      L_Cod = "", L_Avan = 0, L_Lot = "",
+      M_Cod = "", M_Avan = 0, M_Lot = "",
+      Mi_Cod = "", Mi_Avan = 0, Mi_Lot = "",
+      J_Cod = "", J_Avan = 0, J_Lot = "",
+      V_Cod = "", V_Avan = 0, V_Lot = "",
+      S_Cod = "", S_Avan = 0, S_Lot = "",
+      stringsAsFactors = FALSE
+    )
+    return(df)
+  }
+  
+  # Reactivo que genera la tabla cuando cambias de labor
+  tabla_datos <- reactiveVal()
+  
+  observeEvent(labor_activa(), {
+    # Filtramos trabajadores por la labor del botón
+    personal <- trabajadores %>% 
+      filter(ACTIVIDAD == labor_activa()) %>% 
+      pull(NOMBRE)
+    
+    # Creamos la matriz para ese personal
+    tabla_datos(crear_matriz_ingreso(personal))
+  })
+  
+  
+  ####################################
+  
+  # 
+  # # Dentro de tu renderUI del formulario, antes de la tabla:
+  # fluidRow(
+  #   column(6, helpText("Instrucciones: Haga doble clic en una celda para ingresar datos. 
+  #                    Use el código del tarifario (ej: 700015 para Deshoje).")),
+  #   column(6, align = "right", actionButton("guardar_labores", "Guardar Reporte Semanal", 
+  #                                           icon = icon("save"), class = "btn-success"))
+  # )
+  # 
+  # 
+  # 
+  ########################
+  ####################################
+  
+  output$tabla_ingreso_avance <- renderDT({
+    req(tabla_datos())
+    
+    datatable(
+      tabla_datos(),
+      editable = "cell", # Permite escribir directamente en la tabla
+      selection = "none",
+      rownames = FALSE,
+     
+      options = list(
+       
+        pageLength = 50,
+        scrollX = TRUE,
+        columnDefs = list(list(className = 'dt-center', targets = "_all"),
+        list(width = '250px', targets = 0) # Columna de nombres más ancha
+      ),
+      
+      
+      # ESTE ES EL TRUCO: Un script que une las celdas del nombre si son iguales
+      drawCallback = JS(
+        "function(settings) {
+          var api = this.api();
+          var rows = api.rows({page:'current'}).nodes();
+          var last = null;
+          api.column(0, {page:'current'}).data().each(function(group, i) {
+            if (last === group) {
+              $(rows).eq(i).find('td:first').remove();
+              var prevRow = $(rows).eq(i-1).find('td:first');
+              prevRow.attr('rowspan', parseInt(prevRow.attr('rowspan') || 1) + 1);
+              prevRow.css('vertical-align', 'middle');
+            }
+            last = group;
+          });
+        }"
+      )
+      
+      
+      
+      ),
+      # Agrupamos las cabeceras como en tu Excel
+      container = htmltools::withTags(table(
+        class = 'display',
+        thead(
+          tr(
+            th(rowspan = 2, "NOMBRES / APELLIDOS", style = "vertical-align: middle; border-right: 2px solid #d1d1d1;"),
+            th(colspan = 3, "LUNES", style = "border-right: 1px solid #d1d1d1; text-align: center;"),
+            th(colspan = 3, "MARTES", style = "border-right: 1px solid #d1d1d1; text-align: center;"),
+            th(colspan = 3, "MIERCOLES", style = "border-right: 1px solid #d1d1d1; text-align: center;"),
+            th(colspan = 3, "JUEVES", style = "border-right: 1px solid #d1d1d1; text-align: center;"),
+            th(colspan = 3, "VIERNES", style = "border-right: 1px solid #d1d1d1; text-align: center;"),
+            th(colspan = 3, "SABADO", style = "text-align: center;"),
+            th(rowspan = 2, "OBSERVACIONES", style = "vertical-align: middle;") # Columna final
+            
+          ),
+          tr(
+            lapply(rep(c("Cod", "Avan", "Lot"), 6), th)
+          )
+        )
+      ))
+    )
+  })
+  
+  
+  
+  crear_matriz_ingreso <- function(lista_nombres) {
+    # rep(..., each = 2) garantiza que sean idénticos
+    nombres_duplicados <- rep(lista_nombres, each = 2)
+    
+    df <- data.frame(
+      TRABAJADOR = nombres_duplicados,
+      L_Cod = "", L_Avan = 0, L_Lot = "",
+      M_Cod = "", M_Avan = 0, M_Lot = "",
+      Mi_Cod = "", Mi_Avan = 0, Mi_Lot = "",
+      J_Cod = "", J_Avan = 0, J_Lot = "",
+      V_Cod = "", V_Avan = 0, V_Lot = "",
+      S_Cod = "", S_Avan = 0, S_Lot = "",
+      OBSERVACIONES = "", # <--- AGREGA ESTO AQUÍ
+      stringsAsFactors = FALSE
+    )
+    return(df)
+  }
+  
+  #es vital que cuando el jefe edite una celda, el cambio se guarde en la fila correcta.
+  # Este bloque escucha cada vez que alguien escribe en una celda
+  observeEvent(input$tabla_ingreso_avance_cell_edit, {
+    info <- input$tabla_ingreso_avance_cell_edit
+    
+    # Creamos una copia temporal de los datos actuales
+    datos_actuales <- tabla_datos()
+    
+    # IMPORTANTE: 
+    # info$row es la fila (empezando desde 1)
+    # info$col es la columna (empezando desde 0)
+    # Como nuestra primera columna es 'TRABAJADOR', sumamos +1 para editar la columna correcta
+    
+    datos_actuales[info$row, info$col + 1] <- info$value
+    
+    # Guardamos los datos ya editados de vuelta en la variable reactiva
+    tabla_datos(datos_actuales)
+  })
+  
+  
+  
   
   
   
