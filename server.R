@@ -1610,18 +1610,7 @@ server <- function(input, output, session) {
       tagList( # <--- ESTO ES FUNDAMENTAL
         # USAMOS tagList para que Shiny renderice todos los bloques if y fluidRows correctamente
         
-        # >>> PEGA ESTO AQUÍ (INICIO DE LA PWA) <<<
-        tags$head(
-          # Enlace al nuevo manifiesto que creamos en la carpeta www
-          tags$link(rel = "manifest", href = "pwa-manifest.json"),
-          # Configuración para iPhone
-          tags$meta(name = "apple-mobile-web-app-capable", content = "yes"),
-          tags$meta(name = "apple-mobile-web-app-status-bar-style", content = "black"),
-          tags$link(rel = "apple-touch-icon", href = "icon-512.png"),
-          # Escala para que no se vea chiquito en el celular
-          tags$meta(name = "viewport", content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no")
-        ),
-        # >>> FIN DE LA CONFIGURACIÓN PWA <<<
+   
         
         
         # BOTÓN SOLO PARA ADMINS
