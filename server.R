@@ -1197,30 +1197,9 @@ server <- function(input, output, session) {
           ##########################
           
           tabItem(tabName = "labores_reporte",
-                  fluidRow(
-                    column(12, h2("Seleccione Labor para Ingreso", " - dar click en el nombre de la labor" ), br())
-                  ),
                   
-                  # FILA DE BOTONES DE ACCESO
-                  fluidRow(
-                    column(3, actionButton("btn_enfundadores", 
-                                           label = div(icon("user-check", "fa-3x"), br(), "ENFUNDADORES"),
-                                           style = "width:100%; height:120px; background-color: #007bff; color: white; font-size: 18px; font-weight: bold;")),
-                    column(3, actionButton("btn_deshojadores", 
-                                           label = div(icon("leaf", "fa-3x"), br(), "DESHOJADORES"),
-                                           style = "width:100%; height:120px; background-color: #28a745; color: white; font-size: 18px; font-weight: bold;")),
-                    column(3, actionButton("btn_enzunchadores", 
-                                           label = div(icon("link", "fa-3x"), br(), "ENZUNCHADORES"),
-                                           style = "width:100%; height:120px; background-color: #ffc107; color: black; font-size: 18px; font-weight: bold;")),
-                    column(3, actionButton("btn_deschantadores", 
-                                           label = div(icon("broom", "fa-3x"), br(), "DESCHANTADORES"),
-                                           style = "width:100%; height:120px; background-color: #17a2b8; color: white; font-size: 18px; font-weight: bold;"))
-                  ),
+                  uiOutput("contenido_dinamico_labores")
                   
-                  hr(),
-                  
-                  # AQUÍ APARECERÁ EL FORMULARIO DESPUÉS DE DAR CLIC
-                  uiOutput("formulario_labor_dinamico")
           ),
           
           ##########################################
@@ -2607,6 +2586,9 @@ server <- function(input, output, session) {
   
   #es vital que cuando el jefe edite una celda, el cambio se guarde en la fila correcta.
   # Este bloque escucha cada vez que alguien escribe en una celda
+  
+  
+  
   observeEvent(input$tabla_ingreso_avance_cell_edit, {
     info <- input$tabla_ingreso_avance_cell_edit
     
@@ -2624,6 +2606,212 @@ server <- function(input, output, session) {
     tabla_datos(datos_actuales)
   })
   
+  ###esto es todo el formulario de labores 
+  ##################################
+  
+  output$contenido_dinamico_labores <- renderUI({
+    
+    if (is.null(labor_activa())) {
+      # --- VISTA DE BOTONES (Si no hay labor seleccionada) ---
+      tagList(
+        fluidRow(column(12, h2("Seleccione Labor para Ingreso", style="text-align:center; font-weight:bold;"))),
+        br(),
+        fluidRow(
+          column(3, actionButton("btn_enfundadores", 
+                                 label = div(icon("user-check", "fa-3x"), br(), "ENFUNDADORES"),
+                                 style = "width:100%; height:140px; background-color: #007bff; color: white; border-radius: 15px; border: 2px solid #0056b3; font-size: 18px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2);")),
+          column(3, actionButton("btn_deshojadores", 
+                                 label = div(icon("leaf", "fa-3x"), br(), "DESHOJADORES"),
+                                 style = "width:100%; height:140px; background-color: #28a745; color: white; border-radius: 15px; border: 2px solid #1e7e34; font-size: 18px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2);")),
+          column(3, actionButton("btn_enzunchadores", 
+                                 label = div(icon("link", "fa-3x"), br(), "ENZUNCHADORES"),
+                                 style = "width:100%; height:140px; background-color: #ffc107; color: black; border-radius: 15px; border: 2px solid #d39e00; font-size: 18px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2);")),
+          column(3, actionButton("btn_deschantadores", 
+                                 label = div(icon("broom", "fa-3x"), br(), "DESCHANTADORES"),
+                                 style = "width:100%; height:140px; background-color: #17a2b8; color: white; border-radius: 15px; border: 2px solid #117a8b; font-size: 18px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2);"))
+        )
+      )
+      
+    } else {
+      # --- VISTA DE CAPTURA (Si YA hay labor seleccionada) ---
+      tagList(
+        # Encabezado con botones de control
+        fluidRow(
+          column(6, h2(paste("Registro de:", labor_activa()), style="font-weight:bold; color:#2c3e50;")),
+          column(6, align = "right", 
+                 actionButton("btn_regresar", " Cambiar Labor", icon = icon("arrow-left"), class = "btn-warning", style="margin-top:20px;"),
+                 actionButton("btn_guardar_firebase", " Guardar en Firebase", icon = icon("save"), class = "btn-success", style="margin-top:20px; margin-left:10px;")
+          )
+        ),
+        br(),
+        
+        # PANEL DE CAPTURA SUPERIOR (Igual al de Enfunde)
+        fluidRow(
+          # Caja de Tiempo y Semana
+          box(title = "1. Periodo y Ubicación", status = "primary", solidHeader = TRUE, width = 4,
+              column(6, numericInput("num_semana", "Semana", value = 5, min = 1, max = 52)),
+              column(6, numericInput("num_anio", "Año", value = 2026))
+          ),
+          
+          # Caja de Ingreso de Datos
+          box(title = "2. Ingreso Diario por Trabajador", status = "warning", solidHeader = TRUE, width = 8,
+              fluidRow(
+                # Busca tu línea de read_excel y ponla así:
+           
+                column(4, selectInput("sel_trabajador", "Trabajador", choices = unique(trabajadores$NOMBRE))), # Se llena dinámicamente
+                
+                
+                
+                column(4, selectInput("sel_dia", "Día Laborado", choices = c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"))),
+                
+                
+                column(4, selectInput("sel_lote", "Lote", choices = unique(lotes$LOTE)))
+                
+                
+                
+              ),
+              fluidRow(
+               # column(4, textInput("txt_codigo_labor", "Código", placeholder = "Ej: 700015")),
+                
+                column(4, 
+                       # Selector usando 'CODLABOR'
+                       selectizeInput("txt_codigo_labor", "Código de Labor", 
+                                      choices = c("Seleccione..." = "", tarifario$CODLABOR),
+                                      options = list(placeholder = 'Busque el código aquí...')),
+                       
+                       # Espacio para la descripción dinámica
+                       uiOutput("desc_labor_dinamica") 
+                ),
+                
+                
+                
+                column(4, numericInput("num_avance_diario", "Avance", value = 0, step = 0.1),
+                       
+                       
+                       # Aquí se mostrará "Unidad: Ha", "Unidad: Racimos", etc.
+                       uiOutput("unidad_medida_dinamica")
+                       
+                       ),
+                
+                
+                
+                column(4, br(), actionButton("btn_agregar_avance", " Agregar a Tabla", 
+                                             icon = icon("plus"), class = "btn-info", style="width:100%; font-weight:bold;"))
+              )
+          )
+        ),
+        
+        # TABLA RESUMEN INFERIOR
+        fluidRow(
+          box(title = "Visualización Semanal de Labores", status = "info", solidHeader = TRUE, width = 12,
+              DTOutput("tabla_ingreso_avance")
+          )
+        )
+      )
+    }
+  })
+  
+  
+  ###############################
+  
+  # Lógica para el botón de Regresar (limpia la selección)
+  observeEvent(input$btn_regresar, {
+    labor_activa(NULL)
+  })
+  
+  
+  ##### esto es para poner el poner lo de arriba la cabecera abajo en la tabla con los botones
+  
+  # Lógica para mover los datos del panel de captura a la tabla resumen
+
+  
+  observeEvent(input$btn_agregar_avance, {
+    # 1. Validar entradas
+    if (input$txt_codigo_labor == "" || input$num_avance_diario <= 0) {
+      showNotification("Ingrese Código y Avance mayor a 0", type = "warning")
+      return()
+    }
+    
+    df <- tabla_datos()
+    
+    # 2. Buscamos la fila del trabajador
+    # Importante: input$sel_trabajador ahora trae el nombre del 'LISTADO TRABAJDORES AGRICOLAS'
+    fila_idx <- which(df$TRABAJADOR == input$sel_trabajador)
+    
+    # Si por alguna razón el nombre no coincide exactamente entre las dos tablas
+    if (length(fila_idx) == 0) {
+      showNotification("Error: El trabajador no se encuentra en la tabla de la semana", type = "error")
+      return()
+    }
+    
+    # 3. Definir columna base según el día
+    col_base <- switch(input$sel_dia,
+                       "Lunes" = 2, "Martes" = 5, "Miércoles" = 8, 
+                       "Jueves" = 11, "Viernes" = 14, "Sábado" = 17)
+    
+    # 4. Lógica de "Fila Inteligente" para las dos filas por trabajador
+    target_row <- fila_idx[1] 
+    if (df[fila_idx[1], col_base] != "" && length(fila_idx) > 1) {
+      target_row <- fila_idx[2] 
+    }
+    
+    # 5. Insertamos los datos usando los IDs de tu panel de captura
+    df[target_row, col_base]     <- input$txt_codigo_labor
+    df[target_row, col_base + 1] <- input$num_avance_diario
+    df[target_row, col_base + 2] <- input$sel_lote  # Viene de LOTESH
+    
+    # 6. Actualizamos la tabla visual
+    tabla_datos(df)
+    
+    # 7. Limpiamos campos para el siguiente ingreso
+    updateNumericInput(session, "num_avance_diario", value = 0)
+    updateSelectizeInput(session, "txt_codigo_labor", selected = "")
+    
+    showNotification(paste("Añadido:", input$sel_trabajador), type = "message")
+  })
+  
+  
+  
+  
+  
+  ###########################
+  ###este solamte es para el combo del filtro de codigo de labor 
+  
+  output$desc_labor_dinamica <- renderUI({
+    req(input$txt_codigo_labor) 
+    
+    # Filtramos usando los nombres exactos de tu imagen
+    info_labor <- tarifario[tarifario$CODLABOR == input$txt_codigo_labor, ]
+    
+    if(nrow(info_labor) > 0) {
+      tags$div(
+        style = "margin-top: 8px; padding: 10px; background-color: #e9ecef; border-left: 4px solid #28a745; border-radius: 4px;",
+        tags$strong(style = "color: #155724; font-size: 13px;", " "),
+        tags$span(style = "color: #155724; font-size: 13px;", info_labor$NOMBRELAB)
+      )
+    } else {
+      tags$span(style = "color: red; font-size: 11px;", "Código no encontrado")
+    }
+  })
+  
+  
+  ###########################
+  ###este solamte es para PONER LA UNDAD DE MEDIAD QUE DEBE INGRESAR
+  
+  output$unidad_medida_dinamica <- renderUI({
+    req(input$txt_codigo_labor) 
+    
+    # Buscamos la fila en el tarifario usando tu columna CODLABOR
+    info_labor <- tarifario[tarifario$CODLABOR == input$txt_codigo_labor, ]
+    
+    if(nrow(info_labor) > 0) {
+      tags$div(
+        style = "margin-top: 5px; font-weight: bold; color: #6c757d; font-size: 12px;",
+        icon("ruler-combined"), # Un pequeño icono de medida
+        paste(" Unidad:", info_labor$UMED_PAGO)
+      )
+    }
+  })
   
   
   
