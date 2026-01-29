@@ -960,6 +960,33 @@ server <- function(input, output, session) {
       
       
       dashboardBody(
+        
+        
+        
+        # >>> CONFIGURACIÓN PWA E INSTALACIÓN (COPIAR DESDE AQUÍ) <<<
+        tags$head(
+          # Enlaces del Manifiesto y Apple
+          tags$link(rel = "manifest", href = "pwa-manifest.json"),
+          tags$meta(name = "apple-mobile-web-app-capable", content = "yes"),
+          tags$meta(name = "apple-mobile-web-app-status-bar-style", content = "black"),
+          tags$link(rel = "apple-touch-icon", href = "icon-512.png"),
+          tags$meta(name = "viewport", content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no")
+        ),
+        
+        # Registro del Service Worker
+        tags$script(HTML("
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  ")),
+        # >>> FIN CONFIGURACIÓN PWA <<<
+        
+        
+        
+        #########################
+        
+        
+        
         tags$script(HTML("
     $(document).on('click', '.sidebar-menu a', function() {
       var tabName = $(this).attr('data-value');
