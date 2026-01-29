@@ -61,7 +61,7 @@ tryCatch({
 
 server <- function(input, output, session) {
   
-  
+  addResourcePath("www", "www")
   
   
   user_email_js <- reactiveVal(NULL)
@@ -975,10 +975,12 @@ server <- function(input, output, session) {
         
         # Registro del Service Worker
         tags$script(HTML("
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
-    }
-  ")),
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js')
+    .then(function() { console.log('Service Worker Registrado Correctamente'); })
+    .catch(function(error) { console.log('Fallo el registro:', error); });
+  }
+")),
         # >>> FIN CONFIGURACIÓN PWA <<<
         
         
