@@ -1,6 +1,6 @@
 {
   "name": "Sistema Gestión Bananera",
-  "short_name": "AgroDashboard",
+  "short_name": "SISBANLAM",
   "description": "Sistema Integrado de Labores, Enfunde y Parámetros",
   "start_url": ".",
   "display": "standalone",
