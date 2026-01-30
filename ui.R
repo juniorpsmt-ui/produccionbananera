@@ -8,7 +8,8 @@ library(DT)
 
 # Definición de la interfaz
 ui <- fluidPage(
- 
+   
+
   
   # >>> CONFIGURACIÓN PWA E INSTALACIÓN (COPIAR DESDE AQUÍ) <<<
   tags$head(

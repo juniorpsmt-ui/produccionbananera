@@ -963,7 +963,8 @@ server <- function(input, output, session) {
         
         
       
-        
+        # Este código genera un estilo CSS que bloquea los clics solo para el Observador
+        uiOutput("style_bloqueo"),
         
         
         #########################
@@ -2825,6 +2826,100 @@ server <- function(input, output, session) {
       )
     }
   })
+  
+  
+  ###########
+  
+  
+  
+  ##########ESTO ES PRA EL USUARIO OBSERVADOR
+  
+  
+  # output$style_bloqueo <- renderUI({
+  #   user <- user_info() 
+  #   
+  #   if (!is.null(user$role) && user$role == "OBSERVADOR") {
+  #     tags$style(HTML("
+  #     /* 1. Bloquea botones, inputs y selectores en todo el cuerpo */
+  #     .content-wrapper .btn, 
+  #     .content-wrapper .form-control, 
+  #     .content-wrapper .selectize-input,
+  #     .content-wrapper .dt-button { 
+  #       pointer-events: none !important; 
+  #       opacity: 0.6; 
+  #       cursor: not-allowed;
+  #     }
+  # 
+  #     /* 2. ASEGURA QUE EL MENÚ LATERAL SIEMPRE FUNCIONE */
+  #     .main-sidebar, .sidebar, .sidebar-menu, .treeview, .sidebar-toggle {
+  #       pointer-events: auto !important;
+  #       opacity: 1 !important;
+  #     }
+  # 
+  #     /* 3. PERMITE EL SCROLL Y LA INTERACCIÓN CON LAS TABLAS/GRÁFICOS */
+  #     .content-wrapper { 
+  #       pointer-events: auto !important; 
+  #     }
+  #     
+  #     /* 4. Pero bloquea específicamente el clic sobre las celdas editables de las tablas */
+  #     .content-wrapper table td {
+  #       pointer-events: auto;
+  #     }
+  #   "))
+  #   }
+  # })
+  # 
+  # 
+  # 
+  
+  ##################################
+  
+  ########## ESTO ES PARA EL USUARIO OBSERVADOR (SIN BLOQUEO NEGRO) ##########
+  output$style_bloqueo <- renderUI({
+    user <- user_info() 
+    
+    if (!is.null(user$role) && user$role == "OBSERVADOR") {
+      tags$style(HTML("
+      /* 1. EVITA EL BLOQUEO DEL HEADER (Donde está el nombre y el logo) */
+      .main-header, .main-header .logo, .main-header .navbar, .user-footer {
+        pointer-events: auto !important;
+        background-color: inherit !important;
+      }
+
+      /* 2. BLOQUEA SOLO LOS FORMULARIOS Y BOTONES DE ACCIÓN */
+      /* Esto hace que no puedan escribir pero que todo se vea bien */
+      .content-wrapper input, 
+      .content-wrapper select, 
+      .content-wrapper textarea, 
+      .content-wrapper .selectize-input,
+      .content-wrapper .btn-primary,
+      .content-wrapper .btn-success { 
+        pointer-events: none !important; 
+        opacity: 0.6; 
+      }
+
+      /* 3. LIBERA LAS TABLAS Y DASHBOARDS */
+      /* Para que pueda ver los enfundes y las labores sin problemas */
+      .content-wrapper .box, 
+      .content-wrapper .dataTable, 
+      .content-wrapper .dataTables_wrapper,
+      .content-wrapper .shiny-plot-output,
+      .content-wrapper .info-box {
+        pointer-events: auto !important;
+        opacity: 1 !important;
+      }
+
+      /* 4. LIBERA EL MENÚ PARA NAVEGAR */
+      .main-sidebar { 
+        pointer-events: auto !important; 
+      }
+    "))
+    }
+  })
+  
+  
+  
+  
   
   
   
