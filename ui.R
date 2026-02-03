@@ -77,7 +77,7 @@ ui <- fluidPage(
      ############-------------------------------------------------------
       # NUEVO: BOTÓN DE INSTALACIÓN UNIVERSAL
       # ---------------------------------------------------------
-      div(id = "contenedor_instalar", style = "margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px;",
+      div(id = "contenedor_instalar", style = "margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px; display: none;",
           actionButton("btn_instalar_manual", "INSTALAR APP SISBANLAM", 
                        icon = icon("download"), 
                        style = "background-color: #007bff; color: white; font-weight: bold; width: 100%; border-radius: 5px;"),

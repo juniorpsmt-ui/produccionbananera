@@ -2920,35 +2920,38 @@ server <- function(input, output, session) {
   
   ##############################################################
   
-  
-  # --- LÓGICA DE INSTALACIÓN PWA ---
+  # --- LÓGICA DE INSTALACIÓN PWA (VERSIÓN FINAL CORREGIDA) ---
   shinyjs::runjs("
-    // 1. SI YA ESTÁ INSTALADA: Detecta el modo 'App' y borra el botón para que no salga
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
-      $('#contenedor_instalar').remove();
+    function gestionarBotonInstalacion() {
+      // 1. Detectar si ya es APP instalada
+      const esPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      
+      if (esPWA) {
+        console.log('App detectada: Eliminando botón');
+        $('#contenedor_instalar').remove();
+      } else {
+        console.log('Navegador detectado: Mostrando botón');
+        $('#contenedor_instalar').show();
+      }
     }
 
-    // 2. CAPTURA EL EVENTO: Para navegadores que permiten instalación rápida
+    // Ejecutar al cargar
+    setTimeout(gestionarBotonInstalacion, 500);
+
     let promptInstalacion;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       promptInstalacion = e;
     });
 
-    // 3. CLIC EN EL BOTÓN: Intenta instalar o da instrucciones manuales
     $(document).on('click', '#btn_instalar_manual', function() {
       if (promptInstalacion) {
         promptInstalacion.prompt();
       } else {
-        // Para iPhone o navegadores con cookies/historial que bloquean el aviso
-        alert('INSTRUCCIONES DE INSTALACIÓN:\\n\\n' +
-              'Android (Chrome): Toca los 3 puntos (⋮) y selecciona \"Instalar aplicación\".\\n' +
-              'iPhone (Safari): Toca el botón \"Compartir\" (cuadrado con flecha) y selecciona \"Añadir a pantalla de inicio\".');
+        alert('INSTRUCCIONES:\\n\\nAndroid: Menú (⋮) > Instalar aplicación.\\niPhone: Compartir > Añadir a pantalla de inicio.');
       }
     });
   ")
-  
-  
   
   
   
