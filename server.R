@@ -2918,7 +2918,35 @@ server <- function(input, output, session) {
   })
   
   
+  ##############################################################
   
+  
+  # --- LÓGICA DE INSTALACIÓN PWA ---
+  shinyjs::runjs("
+    // 1. SI YA ESTÁ INSTALADA: Detecta el modo 'App' y borra el botón para que no salga
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+      $('#contenedor_instalar').remove();
+    }
+
+    // 2. CAPTURA EL EVENTO: Para navegadores que permiten instalación rápida
+    let promptInstalacion;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      promptInstalacion = e;
+    });
+
+    // 3. CLIC EN EL BOTÓN: Intenta instalar o da instrucciones manuales
+    $(document).on('click', '#btn_instalar_manual', function() {
+      if (promptInstalacion) {
+        promptInstalacion.prompt();
+      } else {
+        // Para iPhone o navegadores con cookies/historial que bloquean el aviso
+        alert('INSTRUCCIONES DE INSTALACIÓN:\\n\\n' +
+              'Android (Chrome): Toca los 3 puntos (⋮) y selecciona \"Instalar aplicación\".\\n' +
+              'iPhone (Safari): Toca el botón \"Compartir\" (cuadrado con flecha) y selecciona \"Añadir a pantalla de inicio\".');
+      }
+    });
+  ")
   
   
   

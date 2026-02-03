@@ -66,7 +66,32 @@ ui <- fluidPage(
                    style = "width: 100%; margin-top: 15px;"),
       
       # Contenedor para el estado de login (usado por JS)
-      div(id = "login_message", style = "color: red; margin-top: 10px;")
+      div(id = "login_message", style = "color: red; margin-top: 10px;"),
+      
+     ######
+     
+     
+     
+     
+     
+     ############-------------------------------------------------------
+      # NUEVO: BOTÓN DE INSTALACIÓN UNIVERSAL
+      # ---------------------------------------------------------
+      div(id = "contenedor_instalar", style = "margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px;",
+          actionButton("btn_instalar_manual", "INSTALAR APP SISBANLAM", 
+                       icon = icon("download"), 
+                       style = "background-color: #007bff; color: white; font-weight: bold; width: 100%; border-radius: 5px;"),
+          p("Instala para entrar directo sin usar el navegador", style = "font-size: 11px; color: #888; margin-top: 5px;")
+      )
+      #############################
+     
+     
+     
+     
+     
+     
+     
+      
     )
   ),
   
