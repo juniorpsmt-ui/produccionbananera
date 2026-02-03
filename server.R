@@ -2959,7 +2959,7 @@ server <- function(input, output, session) {
       } else {
         // Para iPhone o si el cartel no sale, igual guardamos la marca al dar clic
         localStorage.setItem('app_instalada_sisbanlam', 'true');
-        alert('INSTRUCCIONES:\\n\\nAndroid: Menú (⋮) > Instalar aplicación.\\niPhone: Compartir > Añadir a pantalla de inicio.');
+        alert('INSTRUCCIONES:\\n\\nAndroid: Ir a Menú (⋮) >Presione Agregar Pantalla P y/o Instalar aplicación.\\niPhone: Compartir > Añadir a pantalla de inicio.');
         $('#contenedor_instalar').remove();
       }
     });
