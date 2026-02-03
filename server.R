@@ -2920,23 +2920,25 @@ server <- function(input, output, session) {
   
   ##############################################################
   
-  # --- LÓGICA DE INSTALACIÓN PWA (VERSIÓN FINAL CORREGIDA) ---
+  # --- LÓGICA DE INSTALACIÓN CON MEMORIA ---
   shinyjs::runjs("
-    function gestionarBotonInstalacion() {
-      // 1. Detectar si ya es APP instalada
+    function gestionarBoton() {
+      // 1. Revisar si ya está abierta como APP
       const esPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
       
-      if (esPWA) {
-        console.log('App detectada: Eliminando botón');
+      // 2. Revisar si el usuario YA hizo clic en instalar anteriormente (Memoria del navegador)
+      const yaInstalo = localStorage.getItem('app_instalada_sisbanlam');
+
+      if (esPWA || yaInstalo === 'true') {
+        console.log('El usuario ya tiene la app o ya la instaló. No mostrar botón.');
         $('#contenedor_instalar').remove();
       } else {
-        console.log('Navegador detectado: Mostrando botón');
         $('#contenedor_instalar').show();
       }
     }
 
-    // Ejecutar al cargar
-    setTimeout(gestionarBotonInstalacion, 500);
+    // Ejecutar al cargar la página
+    setTimeout(gestionarBoton, 500);
 
     let promptInstalacion;
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -2947,8 +2949,18 @@ server <- function(input, output, session) {
     $(document).on('click', '#btn_instalar_manual', function() {
       if (promptInstalacion) {
         promptInstalacion.prompt();
+        promptInstalacion.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            // SI ACEPTA: Guardamos en la memoria del navegador que ya la tiene
+            localStorage.setItem('app_instalada_sisbanlam', 'true');
+            $('#contenedor_instalar').remove();
+          }
+        });
       } else {
+        // Para iPhone o si el cartel no sale, igual guardamos la marca al dar clic
+        localStorage.setItem('app_instalada_sisbanlam', 'true');
         alert('INSTRUCCIONES:\\n\\nAndroid: Menú (⋮) > Instalar aplicación.\\niPhone: Compartir > Añadir a pantalla de inicio.');
+        $('#contenedor_instalar').remove();
       }
     });
   ")
