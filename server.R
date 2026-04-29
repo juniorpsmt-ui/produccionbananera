@@ -11,7 +11,19 @@ library(readxl) # Para leer el archivo Excel
 library(tibble) # Necesario para crear tibbles de emergencia
 library(data.table)
 library(lubridate)
+library(plotly)
 
+
+
+# Carga del nuevo maestro de cajas  ESTO ES formulario cajas en linea
+datos_cajas_procesadas <- reactiveFileReader(
+  intervalMillis = 5000, # Revisa cambios cada 5 segundos
+  session = NULL,
+  filePath = "LABORES AGRICOLAS/Cajas registradas en SAN HUMBERTO wk 18 -hlf.xlsx",
+  readFunc = function(filePath) {
+    read_excel(filePath)
+  }
+)
 
 
 
@@ -932,6 +944,10 @@ server <- function(input, output, session) {
           id ="tabsid",
           selected = "tab_enfunde_ingreso",  
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
+          
+          menuItem("Cajas Procesadas en Línea", tabName = "cajas_online", icon = icon("box")),
+          
+          
           menuItem("📊 Reporte Administrativo General por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
           # *** NUEVA PESTAÑA 2: REPORTE POR SEMANA ***
           menuItem("📅 Reporte Administrativo por Semana", tabName = "tab_reporte_admin_semana", icon = icon("calendar-alt")),
@@ -1090,7 +1106,35 @@ server <- function(input, output, session) {
         
         tabItems(
           
-          
+          tabItem(tabName = "cajas_online",
+                  fluidRow(
+                    
+                    valueBoxOutput("box_total_cajas", width = 4),
+                    valueBoxOutput("box_primera_caja", width = 4),
+                    valueBoxOutput("box_ultima_caja", width = 4),
+                    valueBoxOutput("box_horas_procesadas", width = 3) 
+                    
+                    # <-- La nueva tarjeta
+                  ),
+                  # FILA DE GRÁFICO Y TABLA DE RESUMEN
+                  fluidRow(
+                    box(
+                      title = "Distribución de Pesos", 
+                      width = 6, 
+                      status = "success", 
+                      solidHeader = TRUE,
+                      plotlyOutput("grafico_resumen_semaforo") # <--- VERIFICA ESTE NOMBRE
+                    ),
+                    box(
+                      title = "Resumen por Marca", 
+                      width = 5, 
+                      status = "primary", 
+                      solidHeader = TRUE,
+                      DTOutput("tabla_resumen_marcas") # <--- VERIFICA ESTE NOMBRE
+                    )
+                  )
+                  
+          ),
           # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
           # 1. Pestaña de Reporte Administrativo
           tabItem(tabName = "tab_reporte_admin",
@@ -1864,28 +1908,47 @@ server <- function(input, output, session) {
     
     # 2. Generamos los lotes según el rol y la hacienda elegida
     if (u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
-      # 1. Verificamos que el objeto exista
-      req(datos_banano_raw)
+      # # 1. Verificamos que el objeto exista
+      # req(datos_banano_raw)
+      # 
+      # # 2. Buscamos la columna sin importar si es Hacienda, hacienda o HACIENDA
+      # # Usamos un filtro dinámico para evitar el error de 'object not found'
+      # df_lotes <- datos_banano_raw
+      # 
+      # # Forzamos los nombres a mayúsculas para comparar seguro
+      # colnames(df_lotes) <- toupper(colnames(df_lotes))
+      # 
+      # mis_lotes <- df_lotes %>% 
+      #   filter(HACIENDA == toupper(hacienda_actual)) %>% 
+      #   pull(LOTE) %>% 
+      #   unique() %>% 
+      #   sort()
+
       
-      # 2. Buscamos la columna sin importar si es Hacienda, hacienda o HACIENDA
-      # Usamos un filtro dinámico para evitar el error de 'object not found'
-      df_lotes <- datos_banano_raw
+      # CAMBIO CLAVE: Usamos 'lotes' (el maestro) en lugar de 'datos_banano_raw'
+      req(lotes) 
       
-      # Forzamos los nombres a mayúsculas para comparar seguro
-      colnames(df_lotes) <- toupper(colnames(df_lotes))
+      df_maestro_lotes <- lotes
       
-      mis_lotes <- df_lotes %>% 
-        filter(HACIENDA == toupper(hacienda_actual)) %>% 
+      # Forzamos los nombres a mayúsculas para evitar errores de escritura
+      colnames(df_maestro_lotes) <- toupper(colnames(df_maestro_lotes))
+      
+      # Filtramos directamente del archivo LOTESH.xlsx
+      mis_lotes <- df_maestro_lotes %>% 
+        #filter(HACIENDA == toupper(hacienda_actual)) %>% 
         pull(LOTE) %>% 
         unique() %>% 
         sort()
-    } else {
-      mis_lotes <- lotes_del_sector()
+      
+      
+      
+      } else {
+      mis_lotes <- lotes_del_sectorT()
     }
     
     req(mis_lotes)
-    
-    
+
+ 
     
     # mis_lotes <- lotes_del_sector()
     # req(mis_lotes)
@@ -1998,6 +2061,23 @@ server <- function(input, output, session) {
   
   
   
+  ##################hasta aquyi me quyedo es para jefe de sector
+  lotes_del_sectorT <- reactive({
+    u <- user_info()
+    req(u)
+
+    print(u)
+    req(lotes) 
+    print(paste("Buscando lotes para el jefe:", u$name))
+    # Filtramos el maestro de lotes por el nombre del jefe
+    lotes_filtrados <- lotes %>% 
+   
+      filter(JEFE == u$jesector) %>% # Asegúrate que la columna se llame así en el Excel
+      
+      pull(LOTE)
+  
+    return(lotes_filtrados)
+  })
   
   ###############################################
   
@@ -2967,5 +3047,194 @@ server <- function(input, output, session) {
   
   
   
+  # esto es para el formulario de cajas procesadas en linea
+  
+
+  
+  
+  ##### esto es para caajs en linea los oupút box 
+  # 1. TOTAL DE CAJAS PROCESADAS
+  output$box_total_cajas <- renderValueBox({
+    df <- datos_cajas_procesadas()
+    total <- nrow(df) # Cuenta cada fila como una caja
+    valueBox(
+      value = format(total, big.mark=","), 
+      subtitle = "TOTAL CAJAS PROCESADAS", 
+      icon = icon("boxes-stacked"), 
+      color = "green"
+    )
+  })
+  
+  # 2. Promedio de Peso
+  output$box_prom_peso <- renderValueBox({
+    df <- datos_cajas_procesadas()
+    promedio <- if(nrow(df) > 0) round(mean(df$Pesoneto, na.rm = TRUE), 2) else 0
+    valueBox(paste(promedio, "lb"), "PESO PROMEDIO", icon = icon("weight-hanging"), color = "blue")
+  })
+  
+  # 2. HORA DE LA PRIMERA CAJA (Inicio)
+  output$box_primera_caja <- renderValueBox({
+    df <- datos_cajas_procesadas()
+    req(nrow(df) > 0)
+    
+    # Buscamos la fecha/hora más antigua
+    inicio <- min(as.POSIXct(df$Fecha), na.rm = TRUE)
+    
+    
+    valueBox(
+      value = format(inicio, "%H:%M"), 
+      subtitle = "HORA PRIMERA CAJA", 
+      icon = icon("clock"), 
+      color = "blue"
+    )
+  })
+  
+  
+  # 3. HORA DE LA ÚLTIMA CAJA (Fin)
+  output$box_ultima_caja <- renderValueBox({
+    df <- datos_cajas_procesadas()
+    req(nrow(df) > 0)
+    
+    # Buscamos la fecha/hora más reciente
+    fin <- max(as.POSIXct(df$Fecha), na.rm = TRUE)
+    
+    valueBox(
+      value = format(fin, "%H:%M"), 
+      subtitle = "HORA ÚLTIMA CAJA", 
+      icon = icon("stopwatch"), 
+      color = "orange"
+    )
+  })
+  
+  
+  # 4. TOTAL DE HORAS PROCESADAS (Diferencia entre primera y última)
+  output$box_horas_procesadas <- renderValueBox({
+    df <- datos_cajas_procesadas()
+    req(nrow(df) > 0)
+    
+    # Convertimos a formato fecha/hora asegurando el formato
+    tiempos <- as.POSIXct(df$Fecha)
+    
+    inicio <- min(tiempos, na.rm = TRUE)
+    fin <- max(tiempos, na.rm = TRUE)
+    
+    # Calculamos la diferencia total en minutos
+    minutos_totales <- as.numeric(difftime(fin, inicio, units = "mins"))
+    
+    # Calculamos horas y minutos por separado como ENTEROS
+    horas <- as.integer(minutos_totales %/% 60)
+    minutos <- as.integer(minutos_totales %% 60)
+    
+    # Formateamos usando %02d de forma segura
+    tiempo_texto <- sprintf("%02dh %02dm", horas, minutos)
+    
+    valueBox(
+      value = tiempo_texto, 
+      subtitle = "TOTAL TIEMPO PROCESO", 
+      icon = icon("hourglass-half"), 
+      color = "purple"
+    )
+  })
+  
+  
+  
+  
+  
+  
+  #####TASBLA
+  
+  
+  output$tabla_resumen_marcas <- DT::renderDataTable({
+    df <- datos_cajas_procesadas()
+    req(nrow(df) > 0)
+    
+    resumen <- df %>%
+      group_by(MARCA = Marcadecaja, TIPO = Tipodecaja) %>%
+      summarise(
+        CANT = n(),
+        PROM = round(mean(Pesoneto, na.rm = TRUE), 2),
+        MAX = max(Pesoneto, na.rm = TRUE),
+        MIN = min(Pesoneto, na.rm = TRUE),
+        .groups = 'drop'
+      )
+    
+    datatable(resumen, options = list(dom = 't', pageLength = -1), rownames = FALSE, style = 'bootstrap')
+  })
+  
+  
+  #reactivo cuando realñizao el conteo de cajas segun el semaforo
+  
+  # Este objeto reactivo procesa los colores y el conteo
+  resumen_semaforo <- reactive({
+    df <- datos_cajas_procesadas()
+    req(nrow(df) > 0)
+    
+    df %>%
+      mutate(color_semaforo = case_when(
+        Pesoneto > Pesomaximo ~ "Rojo (Exceso)",
+        Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Verde (Correcto)",
+        Pesoneto < PesoF ~ "Café (Bajo Peso)",
+        TRUE ~ "Otros"
+      )) %>%
+      group_by(color_semaforo) %>%
+      summarise(Cantidad = n(), .groups = 'drop')
+  })
+  
+  
+  
+  # Ejemplo para mostrar el conteo de Verdes en un ValueBox
+  output$box_cajas_ok <- renderValueBox({
+    res <- resumen_semaforo()
+    valor <- res$Cantidad[res$color_semaforo == "Verde (Correcto)"]
+    valueBox(ifelse(length(valor)>0, valor, 0), "CAJAS OK (VERDE)", icon = icon("check"), color = "green")
+  })
+  
+  
+  
+  # este es el grafico de barra semafor
+  
+  output$grafico_resumen_semaforo <- renderPlotly({
+    df <- datos_cajas_procesadas()
+    req(nrow(df) > 0)
+    
+    # 1. Clasificamos y contamos agrupando por MARCA y ESTADO
+    df_conteo <- df %>%
+      mutate(Estado = case_when(
+        Pesoneto > Pesomaximo ~ "Sobrepeso (Rojo)",
+        Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Correcto (Verde)",
+        Pesoneto < PesoF ~ "Bajo Peso (Café)",
+        TRUE ~ "Sin Datos"
+      )) %>%
+      group_by(Marcadecaja, Estado) %>%
+      summarise(Cantidad = n(), .groups = 'drop')
+    
+    # 2. Colores del semáforo
+    colores_semaforo <- c(
+      "Sobrepeso (Rojo)" = "#e74c3c", 
+      "Correcto (Verde)" = "#27ae60", 
+      "Bajo Peso (Café)" = "#d2b48c"
+    )
+    
+    # 3. Gráfico con nombres arriba de las barras
+    plot_ly(df_conteo, 
+            x = ~Marcadecaja, 
+            y = ~Cantidad, 
+            color = ~Estado, 
+            colors = colores_semaforo,
+            type = 'bar',
+            # Texto que aparecerá arriba: Cantidad y nombre abreviado si deseas
+            text = ~paste(Cantidad), 
+            textposition = 'outside', # Esto lo pone ARRIBA de la barra
+            hoverinfo = "text",
+            hovertext = ~paste("Marca:", Marcadecaja, "<br>Total:", Cantidad)) %>%
+      layout(
+        title = list(text = "<b>Producción por Marca y Estado</b>"),
+        xaxis = list(title = "Marcas de Cajas"),
+        yaxis = list(title = "Cantidad de Cajas", 
+                     range = c(0, max(df_conteo$Cantidad) * 1.2)), # Espacio extra arriba para el texto
+        barmode = 'group',
+        legend = list(orientation = 'h', x = 0.1, y = -0.2)
+      )
+  })
   
 }
