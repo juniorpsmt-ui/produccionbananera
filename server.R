@@ -3,10 +3,10 @@
 library(shiny)
 library(shinydashboard)
 library(dplyr)
+library(plotly)
 library(DT)
 library(ggplot2) 
 library(shinyjs) 
-library(plotly)
 library(readr) # Necesario para leer archivos CSV
 library(readxl) # Para leer el archivo Excel
 library(tibble) # Necesario para crear tibbles de emergencia
