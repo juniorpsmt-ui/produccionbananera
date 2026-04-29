@@ -3196,7 +3196,7 @@ server <- function(input, output, session) {
     df <- datos_cajas_procesadas()
     req(nrow(df) > 0)
     
-    # 1. Clasificamos y contamos agrupando por MARCA y ESTADO
+    # 1. Agrupamos por marca y estado
     df_conteo <- df %>%
       mutate(Estado = case_when(
         Pesoneto > Pesomaximo ~ "Sobrepeso (Rojo)",
@@ -3207,33 +3207,34 @@ server <- function(input, output, session) {
       group_by(Marcadecaja, Estado) %>%
       summarise(Cantidad = n(), .groups = 'drop')
     
-    # 2. Colores del semáforo
     colores_semaforo <- c(
       "Sobrepeso (Rojo)" = "#e74c3c", 
       "Correcto (Verde)" = "#27ae60", 
       "Bajo Peso (Café)" = "#d2b48c"
     )
     
-    # 3. Gráfico con nombres arriba de las barras
+    # 2. Generamos el gráfico con etiquetas en la parte superior
     plot_ly(df_conteo, 
             x = ~Marcadecaja, 
             y = ~Cantidad, 
             color = ~Estado, 
             colors = colores_semaforo,
             type = 'bar',
-            # Texto que aparecerá arriba: Cantidad y nombre abreviado si deseas
-            text = ~paste(Cantidad), 
-            textposition = 'outside', # Esto lo pone ARRIBA de la barra
+            # Mostramos el nombre de la caja y la cantidad arriba
+            text = ~paste(Marcadecaja, "(", Cantidad, ")"), 
+            textposition = 'outside', 
+            cliponaxis = FALSE, # Evita que el texto se corte
             hoverinfo = "text",
-            hovertext = ~paste("Marca:", Marcadecaja, "<br>Total:", Cantidad)) %>%
+            hovertext = ~paste("Estado:", Estado)) %>%
       layout(
-        title = list(text = "<b>Producción por Marca y Estado</b>"),
-        xaxis = list(title = "Marcas de Cajas"),
+        title = list(text = "<b>Resumen por Marca y Rango de Peso</b>"),
+        xaxis = list(title = "Marcas"),
         yaxis = list(title = "Cantidad de Cajas", 
-                     range = c(0, max(df_conteo$Cantidad) * 1.2)), # Espacio extra arriba para el texto
+                     range = c(0, max(df_conteo$Cantidad) * 1.3)), # Espacio para el nombre
         barmode = 'group',
-        legend = list(orientation = 'h', x = 0.1, y = -0.2)
-      )
+        margin = list(t = 50) # Margen superior para el título y etiquetas
+      ) %>%
+      config(displayModeBar = FALSE) # Limpia el gráfico de botones innecesarios
   })
   
 }
