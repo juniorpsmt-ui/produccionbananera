@@ -2,6 +2,7 @@ library(shiny)
 library(shinydashboard)
 library(shinyjs)
 library(DT)
+library(plotly)
 
 # --- INCLUSIÓN DE DEPENDENCIAS JAVASCRIPT DE FIREBASE (CRÍTICO) ---
 # Solo necesitamos las librerías base, NO FirebaseUI
