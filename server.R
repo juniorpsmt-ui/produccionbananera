@@ -2066,10 +2066,9 @@ server <- function(input, output, session) {
     u <- user_info()
     req(u)
 
-    print(u)
+    
     req(lotes) 
-    print(paste("Buscando lotes para el jefe:", u$name))
-    # Filtramos el maestro de lotes por el nombre del jefe
+# Filtramos el maestro de lotes por el nombre del jefe
     lotes_filtrados <- lotes %>% 
    
       filter(JEFE == u$jesector) %>% # Asegúrate que la columna se llame así en el Excel
