@@ -6,12 +6,12 @@ library(dplyr)
 library(DT)
 library(ggplot2) 
 library(shinyjs) 
+library(plotly)
 library(readr) # Necesario para leer archivos CSV
 library(readxl) # Para leer el archivo Excel
 library(tibble) # Necesario para crear tibbles de emergencia
 library(data.table)
 library(lubridate)
-library(plotly)
 
 
 
