@@ -492,7 +492,7 @@ server <- function(input, output, session) {
     # nos interesa el JEFE_SECTOR.
     
     haciendas <- sort(unique(data$HACIENDA))
-    lotes <- sort(unique(data$LOTE_ID))
+    lotes <- 1:32
     
     # Asumimos que la lista de cintas es fija o proviene de otra fuente
     cintas_colores <- c("NEGRO", "ROJO", "AZUL", "AMARILLO", "BLANCO", "VERDE", "CAFE", "LILA") 
