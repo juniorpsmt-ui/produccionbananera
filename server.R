@@ -942,7 +942,11 @@ server <- function(input, output, session) {
           
           
           id ="tabsid",
-          selected = "tab_enfunde_ingreso",  
+          selected = "cajas_online",  
+          selected = "tab_enfunde_ingreso", 
+   
+          
+          
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
           
           menuItem("Cajas Procesadas en Línea", tabName = "cajas_online", icon = icon("box")),
@@ -1107,6 +1111,25 @@ server <- function(input, output, session) {
         tabItems(
           
           tabItem(tabName = "cajas_online",
+                  
+                  # Estilo para ocultar el botón al momento de imprimir
+                  tags$head(
+                    tags$style(HTML("@media print { .no-print { display: none !important; } }"))
+                  ),
+                  
+                  
+                  fluidRow(
+                    column(width = 12,
+                           actionButton("btn_imprimir", "Imprimir Reporte Completo", 
+                                        icon = icon("print"), 
+                                        class = "btn-primary no-print", # Clase personalizada
+                                        style = "margin-bottom: 20px;",
+                                        onclick = "window.print();") # Activa la impresión
+                    )
+                  ),
+                  
+                  
+                  
                   fluidRow(
                     
                     valueBoxOutput("box_total_cajas", width = 4),
@@ -2386,7 +2409,7 @@ server <- function(input, output, session) {
     if (u$role == "JEFE_SECTOR" || u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
       
       # BLOQUEO ESTRICTO: Solo si la pestaña es 'tab_enfunde_ingreso'
-      if (actual == "tab_enfunde_ingreso"|| actual == "labores_reporte" ) {
+      if (actual == "tab_enfunde_ingreso"|| actual == "labores_reporte" || actual == "cajas_online" ) {
         return(NULL)
       }
     }
@@ -3196,45 +3219,58 @@ server <- function(input, output, session) {
     df <- datos_cajas_procesadas()
     req(nrow(df) > 0)
     
-    # 1. Agrupamos por marca y estado
+    # 1. Obtenemos los límites de peso para el encabezado
+    peso_min <- df$PesoF[1]
+    peso_max <- df$Pesomaximo[1]
+    
+    # 2. Procesamiento de datos con cálculo de porcentajes
     df_conteo <- df %>%
       mutate(Estado = case_when(
-        Pesoneto > Pesomaximo ~ "Sobrepeso (Rojo)",
-        Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Correcto (Verde)",
-        Pesoneto < PesoF ~ "Bajo Peso (Café)",
-        TRUE ~ "Sin Datos"
+        Pesoneto > Pesomaximo ~ "Exceso",
+        Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Óptimo",
+        Pesoneto < PesoF ~ "Bajo Peso",
+        TRUE ~ "Otros"
       )) %>%
       group_by(Marcadecaja, Estado) %>%
-      summarise(Cantidad = n(), .groups = 'drop')
+      summarise(Cantidad = n(), .groups = 'drop') %>%
+      group_by(Marcadecaja) %>%
+      mutate(Porcentaje = (Cantidad / sum(Cantidad)) * 100) # Cálculo del % por marca
     
-    colores_semaforo <- c(
-      "Sobrepeso (Rojo)" = "#e74c3c", 
-      "Correcto (Verde)" = "#27ae60", 
-      "Bajo Peso (Café)" = "#d2b48c"
-    )
+    colores_pro <- c("Exceso" = "#D9534F", "Óptimo" = "#5CB85C", "Bajo Peso" = "#F0AD4E")
     
-    # 2. Generamos el gráfico con etiquetas en la parte superior
+    # 3. Construcción del gráfico profesional
     plot_ly(df_conteo, 
             x = ~Marcadecaja, 
             y = ~Cantidad, 
             color = ~Estado, 
-            colors = colores_semaforo,
+            colors = colores_pro,
             type = 'bar',
-            # Mostramos el nombre de la caja y la cantidad arriba
-            text = ~paste(Marcadecaja, "(", Cantidad, ")"), 
-            textposition = 'outside', 
-            cliponaxis = FALSE, # Evita que el texto se corte
+            # Texto: Cantidad y Porcentaje (ej: 755 - 80%)
+            text = ~paste0(Cantidad, " (", round(Porcentaje, 1), "%)"), 
+            textposition = 'outside',
+            textfont = list(size = 11, color = "#2c3e50"),
             hoverinfo = "text",
-            hovertext = ~paste("Estado:", Estado)) %>%
+            hovertext = ~paste("<b>Marca:</b>", Marcadecaja, 
+                               "<br><b>Estado:</b>", Estado,
+                               "<br><b>Cantidad:</b>", Cantidad,
+                               "<br><b>Representa:</b>", round(Porcentaje, 1), "% de la marca")) %>%
       layout(
-        title = list(text = "<b>Resumen por Marca y Rango de Peso</b>"),
-        xaxis = list(title = "Marcas"),
+        title = list(text = "<b>CALIDAD EN LÍNEA: CANTIDAD Y PORCENTAJE POR ESTADO</b>", x = 0),
+        xaxis = list(title = ""),
         yaxis = list(title = "Cantidad de Cajas", 
-                     range = c(0, max(df_conteo$Cantidad) * 1.3)), # Espacio para el nombre
+                     range = c(0, max(df_conteo$Cantidad) * 1.4)), # Espacio extra para las etiquetas
         barmode = 'group',
-        margin = list(t = 50) # Margen superior para el título y etiquetas
+        annotations = list(
+          list(
+            x = 1, y = 1.05, xref = "paper", yref = "paper",
+            text = paste("<b>Rango Objetivo:</b>", peso_min, "-", peso_max, "lb"),
+            showarrow = FALSE, font = list(size = 12),
+            bgcolor = "#f8f9fa", bordercolor = "#d1d1d1", borderpad = 4
+          )
+        ),
+        legend = list(orientation = 'h', x = 0.5, xanchor = 'center', y = -0.2)
       ) %>%
-      config(displayModeBar = FALSE) # Limpia el gráfico de botones innecesarios
+      config(displayModeBar = FALSE)
   })
   
 }
