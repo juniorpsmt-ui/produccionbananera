@@ -1036,6 +1036,24 @@ server <- function(input, output, session) {
       background-color: #f9f9f9;
       font-weight: bold;
     }
+    
+    
+    /* Ajuste para que los iconos no se salgan de los valueBox EN EN FORMULARIO CAJSS EN LINEA */
+    .small-box .icon-large {
+      font-size: 50px !important; /* Tamaño más moderado */
+      top: 10px !important;       /* Lo baja un poco para que no choque arriba */
+      right: 15px !important;     /* Lo separa del borde derecho */
+      opacity: 0.3;               /* Lo hace un poco más sutil */
+    }
+    
+    /* Evita que el icono se encime con el texto en pantallas pequeñas */
+    .small-box h3, .small-box p {
+      position: relative;
+      z-index: 5;
+    }
+    
+    
+    
   "))
         ),
         
@@ -1119,22 +1137,32 @@ server <- function(input, output, session) {
                   
                   
                   fluidRow(
-                    column(width = 12,
-                           actionButton("btn_imprimir", "Imprimir Reporte Completo", 
+                    
+                    # Columna para el Calendario
+                    column(width = 3,
+                           dateInput("filtro_fecha_cajas", 
+                                     label = "📅 Seleccionar Fecha de Proceso:", 
+                                     value = Sys.Date(), # Fecha por defecto: hoy
+                                     language = "es",
+                                     format = "dd/mm/yyyy")
+                    ),
+                    # Columna para el botón de impresión
+                    column(width = 9, align = "right",
+                           actionButton("btn_imprimir", "Imprimir Reporte", 
                                         icon = icon("print"), 
-                                        class = "btn-primary no-print", # Clase personalizada
-                                        style = "margin-bottom: 20px;",
-                                        onclick = "window.print();") # Activa la impresión
+                                        class = "btn-primary no-print", 
+                                        style = "margin-top: 25px;",
+                                        onclick = "window.print();")
                     )
                   ),
-                  
+                  br(),
                   
                   
                   fluidRow(
                     
-                    valueBoxOutput("box_total_cajas", width = 4),
-                    valueBoxOutput("box_primera_caja", width = 4),
-                    valueBoxOutput("box_ultima_caja", width = 4),
+                    valueBoxOutput("box_total_cajas", width = 3),
+                    valueBoxOutput("box_primera_caja", width = 3),
+                    valueBoxOutput("box_ultima_caja", width = 3),
                     valueBoxOutput("box_horas_procesadas", width = 3) 
                     
                     # <-- La nueva tarjeta
@@ -1143,14 +1171,19 @@ server <- function(input, output, session) {
                   fluidRow(
                     box(
                       title = "Distribución de Pesos", 
-                      width = 6, 
+                      width = 12, # Ocupa toda la pantalla
                       status = "success", 
                       solidHeader = TRUE,
-                      plotlyOutput("grafico_resumen_semaforo") # <--- VERIFICA ESTE NOMBRE
+                      plotlyOutput("grafico_resumen_semaforo", height = "500px") # <--- VERIFICA ESTE NOMBRE
+                      
+                    )
                     ),
+                  
+                  # 3. FILA DE LA TABLA DE RESUMEN (Se mueve a la parte de abajo)
+                  fluidRow(
                     box(
                       title = "Resumen por Marca", 
-                      width = 5, 
+                      width = 12, 
                       status = "primary", 
                       solidHeader = TRUE,
                       DTOutput("tabla_resumen_marcas") # <--- VERIFICA ESTE NOMBRE
@@ -3077,26 +3110,26 @@ server <- function(input, output, session) {
   ##### esto es para caajs en linea los oupút box 
   # 1. TOTAL DE CAJAS PROCESADAS
   output$box_total_cajas <- renderValueBox({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     total <- nrow(df) # Cuenta cada fila como una caja
     valueBox(
       value = format(total, big.mark=","), 
       subtitle = "TOTAL CAJAS PROCESADAS", 
-      icon = icon("boxes-stacked"), 
+      icon = icon("box"), # Icono más simple y limpio
       color = "green"
     )
   })
   
   # 2. Promedio de Peso
   output$box_prom_peso <- renderValueBox({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     promedio <- if(nrow(df) > 0) round(mean(df$Pesoneto, na.rm = TRUE), 2) else 0
     valueBox(paste(promedio, "lb"), "PESO PROMEDIO", icon = icon("weight-hanging"), color = "blue")
   })
   
   # 2. HORA DE LA PRIMERA CAJA (Inicio)
   output$box_primera_caja <- renderValueBox({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     req(nrow(df) > 0)
     
     # Buscamos la fecha/hora más antigua
@@ -3106,7 +3139,7 @@ server <- function(input, output, session) {
     valueBox(
       value = format(inicio, "%H:%M"), 
       subtitle = "HORA PRIMERA CAJA", 
-      icon = icon("clock"), 
+      icon("clock-rotate-left"),
       color = "blue"
     )
   })
@@ -3114,7 +3147,7 @@ server <- function(input, output, session) {
   
   # 3. HORA DE LA ÚLTIMA CAJA (Fin)
   output$box_ultima_caja <- renderValueBox({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     req(nrow(df) > 0)
     
     # Buscamos la fecha/hora más reciente
@@ -3123,7 +3156,7 @@ server <- function(input, output, session) {
     valueBox(
       value = format(fin, "%H:%M"), 
       subtitle = "HORA ÚLTIMA CAJA", 
-      icon = icon("stopwatch"), 
+      icon("clock-check"), 
       color = "orange"
     )
   })
@@ -3131,7 +3164,7 @@ server <- function(input, output, session) {
   
   # 4. TOTAL DE HORAS PROCESADAS (Diferencia entre primera y última)
   output$box_horas_procesadas <- renderValueBox({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     req(nrow(df) > 0)
     
     # Convertimos a formato fecha/hora asegurando el formato
@@ -3153,7 +3186,7 @@ server <- function(input, output, session) {
     valueBox(
       value = tiempo_texto, 
       subtitle = "TOTAL TIEMPO PROCESO", 
-      icon = icon("hourglass-half"), 
+      icon("stopwatch-20"), 
       color = "purple"
     )
   })
@@ -3167,7 +3200,7 @@ server <- function(input, output, session) {
   
   
   output$tabla_resumen_marcas <- DT::renderDataTable({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     req(nrow(df) > 0)
     
     resumen <- df %>%
@@ -3188,7 +3221,7 @@ server <- function(input, output, session) {
   
   # Este objeto reactivo procesa los colores y el conteo
   resumen_semaforo <- reactive({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     req(nrow(df) > 0)
     
     df %>%
@@ -3214,16 +3247,77 @@ server <- function(input, output, session) {
   
   
   # este es el grafico de barra semafor
+  # 
+  # output$grafico_resumen_semaforo <- renderPlotly({
+  #   df <- datos_cajas_procesadas()
+  #   req(nrow(df) > 0)
+  #   
+  #   # 1. Definición de límites y colores
+  #   peso_min <- df$PesoF[1]
+  #   peso_max <- df$Pesomaximo[1]
+  #   colores_pro <- c("Exceso" = "#D9534F", "Óptimo" = "#5CB85C", "Bajo Peso" = "#F0AD4E")
+  #   
+  #   # 2. Procesamiento de datos con porcentajes por marca
+  #   df_conteo <- df %>%
+  #     mutate(Estado = case_when(
+  #       Pesoneto > Pesomaximo ~ "Exceso",
+  #       Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Óptimo",
+  #       Pesoneto < PesoF ~ "Bajo Peso",
+  #       TRUE ~ "Otros"
+  #     )) %>%
+  #     group_by(Marcadecaja, Estado) %>%
+  #     summarise(Cantidad = n(), .groups = 'drop') %>%
+  #     group_by(Marcadecaja) %>%
+  #     mutate(Porcentaje = (Cantidad / sum(Cantidad)) * 100)
+  #   
+  #   # 3. Creación del gráfico con FACETAS (Sub-gráficos)
+  #   # Usamos ggplotly para lograr la separación por marca de forma limpia
+  #   p <- ggplot(df_conteo, aes(x = Estado, y = Cantidad, fill = Estado,
+  #                              text = paste0("<b>Marca:</b> ", Marcadecaja,
+  #                                            "<br><b>Cantidad:</b> ", Cantidad,
+  #                                            "<br><b>Porcentaje:</b> ", round(Porcentaje, 1), "%"))) +
+  #     geom_bar(stat = "identity", width = 0.7) +
+  #     # Etiqueta de Porcentaje arriba de cada barra
+  #     geom_text(aes(label = paste0(round(Porcentaje, 0), "%")), 
+  #               vjust = -0.5, size = 3) +
+  #     # ESTA ES LA LÍNEA MÁGICA: Crea un gráfico por marca
+  #     facet_wrap(~Marcadecaja, scales = "free_x") + 
+  #     scale_fill_manual(values = colores_pro) +
+  #     theme_minimal() +
+  #     labs(title = NULL, x = NULL, y = "Cantidad de Cajas") +
+  #     theme(
+  #       strip.background = element_rect(fill = "#f8f9fa", color = "#d1d1d1"),
+  #       strip.text = element_text(face = "bold", size = 10, color = "#2c3e50"),
+  #       legend.position = "none",
+  #       panel.spacing = unit(2, "lines") # Espacio entre marcas
+  #     )
+  #   
+  #   # Convertir a Plotly interactivo
+  #   ggplotly(p, tooltip = "text") %>%
+  #     layout(
+  #       title = list(text = "<b>RESUMEN DE CALIDAD INDIVIDUAL POR MARCA</b>", x = 0),
+  #       margin = list(t = 60, b = 40),
+  #       annotations = list(
+  #         list(
+  #           x = 1, y = 1.08, xref = "paper", yref = "paper",
+  #           text = paste("<b>Rango Objetivo:</b>", peso_min, "-", peso_max, "lb"),
+  #           showarrow = FALSE, font = list(size = 11),
+  #           bgcolor = "white", bordercolor = "#d1d1d1", borderpad = 4
+  #         )
+  #       )
+  #     ) %>%
+  #     config(displayModeBar = FALSE)
+  # })
+  # 
   
   output$grafico_resumen_semaforo <- renderPlotly({
-    df <- datos_cajas_procesadas()
+    df <- datos_cajas_filtrados()
     req(nrow(df) > 0)
     
-    # 1. Obtenemos los límites de peso para el encabezado
-    peso_min <- df$PesoF[1]
-    peso_max <- df$Pesomaximo[1]
+    # 1. Definición de colores profesionales
+    colores_pro <- c("Exceso" = "#D9534F", "Óptimo" = "#5CB85C", "Bajo Peso" = "#F0AD4E")
     
-    # 2. Procesamiento de datos con cálculo de porcentajes
+    # 2. Procesamiento de datos: Creamos una etiqueta que combine Marca + Rango
     df_conteo <- df %>%
       mutate(Estado = case_when(
         Pesoneto > Pesomaximo ~ "Exceso",
@@ -3232,45 +3326,75 @@ server <- function(input, output, session) {
         TRUE ~ "Otros"
       )) %>%
       group_by(Marcadecaja, Estado) %>%
-      summarise(Cantidad = n(), .groups = 'drop') %>%
+      # Capturamos el rango específico de esa marca para mostrarlo en el título
+      summarise(
+        Cantidad = n(), 
+        RangoText = paste0("(", first(PesoF), " - ", first(Pesomaximo), " lb)"),
+        .groups = 'drop'
+      ) %>%
       group_by(Marcadecaja) %>%
-      mutate(Porcentaje = (Cantidad / sum(Cantidad)) * 100) # Cálculo del % por marca
+      mutate(
+        Porcentaje = (Cantidad / sum(Cantidad)) * 100,
+        # Título dinámico para cada panel
+        EtiquetaPanel = paste(Marcadecaja, RangoText)
+      )
     
-    colores_pro <- c("Exceso" = "#D9534F", "Óptimo" = "#5CB85C", "Bajo Peso" = "#F0AD4E")
+    # 3. Creación del gráfico con Facets
+    p <- ggplot(df_conteo, aes(x = Estado, y = Cantidad, fill = Estado,
+                               text = paste0("<b>", Marcadecaja, "</b>",
+                                             "<br><b>Cantidad:</b> ", Cantidad,
+                                             "<br><b>Porcentaje:</b> ", round(Porcentaje, 1), "%"))) +
+      geom_bar(stat = "identity", width = 0.7) +
+      geom_text(aes(label = paste0(Cantidad, " (", round(Porcentaje, 0), "%)")), 
+                vjust = -0.5, 
+                size = 3.5, 
+                fontface = "bold",
+                color = "#2c3e50") +
+      # Separamos por la nueva etiqueta que incluye el rango
+      facet_wrap(~EtiquetaPanel, scales = "free_x") + 
+      scale_fill_manual(values = colores_pro) +
+      theme_minimal() +
+      labs(title = NULL, x = NULL, y = "Cantidad de Cajas") +
+      theme(
+        strip.background = element_rect(fill = "#2c3e50", color = "#2c3e50"),
+        strip.text = element_text(face = "bold", size = 10, color = "white"),
+        legend.position = "none",
+        panel.spacing = unit(2, "lines"),
+        axis.text.x = element_text(face = "bold")
+      )
     
-    # 3. Construcción del gráfico profesional
-    plot_ly(df_conteo, 
-            x = ~Marcadecaja, 
-            y = ~Cantidad, 
-            color = ~Estado, 
-            colors = colores_pro,
-            type = 'bar',
-            # Texto: Cantidad y Porcentaje (ej: 755 - 80%)
-            text = ~paste0(Cantidad, " (", round(Porcentaje, 1), "%)"), 
-            textposition = 'outside',
-            textfont = list(size = 11, color = "#2c3e50"),
-            hoverinfo = "text",
-            hovertext = ~paste("<b>Marca:</b>", Marcadecaja, 
-                               "<br><b>Estado:</b>", Estado,
-                               "<br><b>Cantidad:</b>", Cantidad,
-                               "<br><b>Representa:</b>", round(Porcentaje, 1), "% de la marca")) %>%
+    # Convertir a Plotly y ajustar Layout
+    ggplotly(p, tooltip = "text") %>%
       layout(
-        title = list(text = "<b>CALIDAD EN LÍNEA: CANTIDAD Y PORCENTAJE POR ESTADO</b>", x = 0),
-        xaxis = list(title = ""),
-        yaxis = list(title = "Cantidad de Cajas", 
-                     range = c(0, max(df_conteo$Cantidad) * 1.4)), # Espacio extra para las etiquetas
-        barmode = 'group',
-        annotations = list(
-          list(
-            x = 1, y = 1.05, xref = "paper", yref = "paper",
-            text = paste("<b>Rango Objetivo:</b>", peso_min, "-", peso_max, "lb"),
-            showarrow = FALSE, font = list(size = 12),
-            bgcolor = "#f8f9fa", bordercolor = "#d1d1d1", borderpad = 4
-          )
-        ),
-        legend = list(orientation = 'h', x = 0.5, xanchor = 'center', y = -0.2)
+        title = list(text = "<b>MONITOREO DE CALIDAD POR MARCA Y RANGO OBJETIVO</b>", x = 0, y = 0.98),
+        margin = list(t = 80, b = 40, l = 50, r = 20)
       ) %>%
       config(displayModeBar = FALSE)
   })
+  
+  
+  ###############
+  ##############
+  #################
+  #################
+  #ESTE ES EL FITRADO POR DIA EL REACTIVO 
+  
+  # --- FILTRO REACTIVO POR FECHA ---
+  # Este es el "cerebro" que conecta tu calendario con los datos
+  # --- FILTRO REACTIVO POR FECHA ---
+  datos_cajas_filtrados <- reactive({
+    # 1. Usamos tu función de lectura actual
+    df <- datos_cajas_procesadas() 
+    
+    # 2. Seguridad: pedimos que existan los datos y el calendario
+    req(df, input$filtro_fecha_cajas)
+    
+    # 3. Filtro comparando solo Día/Mes/Año
+    df_filtrado <- df %>%
+      filter(as.Date(Fecha) == as.Date(input$filtro_fecha_cajas))
+    
+    return(df_filtrado)
+  })
+  
   
 }
