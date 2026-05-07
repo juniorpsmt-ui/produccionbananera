@@ -12,18 +12,54 @@ library(readxl) # Para leer el archivo Excel
 library(tibble) # Necesario para crear tibbles de emergencia
 library(data.table)
 library(lubridate)
+library(httr)
+library(highcharter)
+library(htmltools)
+
+
+# 
+# # Carga del nuevo maestro de cajas  ESTO ES formulario cajas en linea
+# datos_cajas_procesadas <- reactiveFileReader(
+#   intervalMillis = 5000, # Revisa cambios cada 5 segundos
+#   session = NULL,
+#   filePath = "LABORES AGRICOLAS/Cajas registradas en SAN HUMBERTO wk 18 -hlf.xlsx",
+#   readFunc = function(filePath) {
+#     read_excel(filePath)
+#   }
+# )
 
 
 
-# Carga del nuevo maestro de cajas  ESTO ES formulario cajas en linea
-datos_cajas_procesadas <- reactiveFileReader(
-  intervalMillis = 5000, # Revisa cambios cada 5 segundos
-  session = NULL,
-  filePath = "LABORES AGRICOLAS/Cajas registradas en SAN HUMBERTO wk 18 -hlf.xlsx",
-  readFunc = function(filePath) {
-    read_excel(filePath)
-  }
-)
+# --- NUEVA CARGA AUTOMÁTICA DESDE GOOGLE DRIVE ---
+# --- CARGA AUTOMÁTICA DESDE GOOGLE DRIVE CORREGIDA ---
+# --- CARGA DESDE GOOGLE DRIVE (VERSIÓN ESTABLE) ---
+# --- CARGA DESDE DRIVE CON LIMPIEZA DE MEMORIA ---
+# --- CARGA DESDE GOOGLE DRIVE (SÚPER ESTABLE) ---
+# --- CARGA BLINDADA DESDE GOOGLE DRIVE ---
+# --- CARGA POR DESCARGA DIRECTA (SIN OBJETOS REQUEST) ---
+# 1. Función para descargar el archivo (Fuera de cualquier reactivo)
+descargar_datos <- function() {
+  file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
+  url <- paste0("https://docs.google.com/spreadsheets/d/", file_id, "/export?format=xlsx")
+  tf <- tempfile(fileext = ".xlsx")
+  
+  tryCatch({
+    download.file(url, tf, mode = "wb", quiet = TRUE)
+    if (file.exists(tf)) {
+      df <- readxl::read_excel(tf)
+      return(as.data.frame(df))
+    }
+  }, error = function(e) return(NULL))
+  return(NULL)
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -69,9 +105,15 @@ tryCatch({
 #View( datos_banano_raw)
 
 
-
+httr::set_config(httr::config(http_version = 0))
 
 server <- function(input, output, session) {
+  
+  
+  
+  
+  #########################################
+  
   
   addResourcePath("www", "www")
   
@@ -1174,8 +1216,8 @@ server <- function(input, output, session) {
                       width = 12, # Ocupa toda la pantalla
                       status = "success", 
                       solidHeader = TRUE,
-                      plotlyOutput("grafico_resumen_semaforo", height = "500px") # <--- VERIFICA ESTE NOMBRE
-                      
+                      #  highchartOutput("grafico_resumen_semaforo", height = "500px") # <--- VERIFICA ESTE NOMBRE
+                      uiOutput("contenedor_graficos")
                     )
                     ),
                   
@@ -3247,18 +3289,23 @@ server <- function(input, output, session) {
   
   
   # este es el grafico de barra semafor
-  # 
-  # output$grafico_resumen_semaforo <- renderPlotly({
-  #   df <- datos_cajas_procesadas()
-  #   req(nrow(df) > 0)
+ 
+  
+  ##################
+  #####################
+  ###############
+  ###############
+  
+  
+  ###########
+  
+  
+  # output$grafico_resumen_semaforo <- renderHighchart({
+  #   df_raw <- datos_cajas_filtrados()
+  #   req(nrow(df_raw) > 0)
   #   
-  #   # 1. Definición de límites y colores
-  #   peso_min <- df$PesoF[1]
-  #   peso_max <- df$Pesomaximo[1]
-  #   colores_pro <- c("Exceso" = "#D9534F", "Óptimo" = "#5CB85C", "Bajo Peso" = "#F0AD4E")
-  #   
-  #   # 2. Procesamiento de datos con porcentajes por marca
-  #   df_conteo <- df %>%
+  #   # 1. Procesar datos con porcentajes y colores
+  #   df_listo <- df_raw %>%
   #     mutate(Estado = case_when(
   #       Pesoneto > Pesomaximo ~ "Exceso",
   #       Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Óptimo",
@@ -3268,57 +3315,55 @@ server <- function(input, output, session) {
   #     group_by(Marcadecaja, Estado) %>%
   #     summarise(Cantidad = n(), .groups = 'drop') %>%
   #     group_by(Marcadecaja) %>%
-  #     mutate(Porcentaje = (Cantidad / sum(Cantidad)) * 100)
-  #   
-  #   # 3. Creación del gráfico con FACETAS (Sub-gráficos)
-  #   # Usamos ggplotly para lograr la separación por marca de forma limpia
-  #   p <- ggplot(df_conteo, aes(x = Estado, y = Cantidad, fill = Estado,
-  #                              text = paste0("<b>Marca:</b> ", Marcadecaja,
-  #                                            "<br><b>Cantidad:</b> ", Cantidad,
-  #                                            "<br><b>Porcentaje:</b> ", round(Porcentaje, 1), "%"))) +
-  #     geom_bar(stat = "identity", width = 0.7) +
-  #     # Etiqueta de Porcentaje arriba de cada barra
-  #     geom_text(aes(label = paste0(round(Porcentaje, 0), "%")), 
-  #               vjust = -0.5, size = 3) +
-  #     # ESTA ES LA LÍNEA MÁGICA: Crea un gráfico por marca
-  #     facet_wrap(~Marcadecaja, scales = "free_x") + 
-  #     scale_fill_manual(values = colores_pro) +
-  #     theme_minimal() +
-  #     labs(title = NULL, x = NULL, y = "Cantidad de Cajas") +
-  #     theme(
-  #       strip.background = element_rect(fill = "#f8f9fa", color = "#d1d1d1"),
-  #       strip.text = element_text(face = "bold", size = 10, color = "#2c3e50"),
-  #       legend.position = "none",
-  #       panel.spacing = unit(2, "lines") # Espacio entre marcas
+  #     mutate(
+  #       Porcentaje = round((Cantidad / sum(Cantidad)) * 100, 1),
+  #       Color = case_when(
+  #         Estado == "Óptimo" ~ "#5CB85C",    # Verde
+  #         Estado == "Exceso" ~ "#D9534F",    # Rojo
+  #         Estado == "Bajo Peso" ~ "#F0AD4E", # Naranja
+  #         TRUE ~ "#777777"
+  #       )
   #     )
   #   
-  #   # Convertir a Plotly interactivo
-  #   ggplotly(p, tooltip = "text") %>%
-  #     layout(
-  #       title = list(text = "<b>RESUMEN DE CALIDAD INDIVIDUAL POR MARCA</b>", x = 0),
-  #       margin = list(t = 60, b = 40),
-  #       annotations = list(
-  #         list(
-  #           x = 1, y = 1.08, xref = "paper", yref = "paper",
-  #           text = paste("<b>Rango Objetivo:</b>", peso_min, "-", peso_max, "lb"),
-  #           showarrow = FALSE, font = list(size = 11),
-  #           bgcolor = "white", bordercolor = "#d1d1d1", borderpad = 4
+  #   # 2. CREACIÓN DINÁMICA DE GRÁFICOS (Uno por marca)
+  #   # Esto crea una lista de mini-gráficos
+  #   marcas <- unique(df_listo$Marcadecaja)
+  #   
+  #   graficos <- lapply(marcas, function(m) {
+  #     data_marca <- df_listo %>% filter(Marcadecaja == m)
+  #     
+  #     hchart(data_marca, "column", hcaes(x = Estado, y = Cantidad, color = Color)) %>%
+  #       hc_title(text = paste("Marca:", m), style = list(fontSize = "14px", fontWeight = "bold")) %>%
+  #       hc_xAxis(title = list(text = "")) %>%
+  #       hc_yAxis(title = list(text = "Cajas")) %>%
+  #       hc_plotOptions(column = list(
+  #         dataLabels = list(
+  #           enabled = TRUE, 
+  #           format = "{point.y} ({point.Porcentaje}%)", # Muestra Cantidad y %
+  #           style = list(fontSize = "10px")
   #         )
-  #       )
-  #     ) %>%
-  #     config(displayModeBar = FALSE)
+  #       )) %>%
+  #       hc_tooltip(pointFormat = "Estado: {point.Estado}<br>Cantidad: {point.y}<br>Porcentaje: {point.Porcentaje}%")
+  #   })
+  #   
+  #   # 3. Agrupar todos los gráficos en una sola vista
+  #   hw_grid(graficos, ncol = 2, rowheight = 300) 
   # })
-  # 
+  # #############
   
-  output$grafico_resumen_semaforo <- renderPlotly({
-    df <- datos_cajas_filtrados()
-    req(nrow(df) > 0)
+  ##############
+  #################
+  
+  output$contenedor_graficos <- renderUI({
+    df_raw <- datos_cajas_filtrados()
     
-    # 1. Definición de colores profesionales
-    colores_pro <- c("Exceso" = "#D9534F", "Óptimo" = "#5CB85C", "Bajo Peso" = "#F0AD4E")
+    # Si aún no hay datos, mostrar un mensaje de carga
+    if (is.null(df_raw) || nrow(df_raw) == 0) {
+      return(h4("Cargando datos desde Excel...", style = "color: grey; text-align: center; padding: 50px;"))
+    }
     
-    # 2. Procesamiento de datos: Creamos una etiqueta que combine Marca + Rango
-    df_conteo <- df %>%
+    # 1. Procesar datos
+    df_listo <- df_raw %>%
       mutate(Estado = case_when(
         Pesoneto > Pesomaximo ~ "Exceso",
         Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Óptimo",
@@ -3326,75 +3371,78 @@ server <- function(input, output, session) {
         TRUE ~ "Otros"
       )) %>%
       group_by(Marcadecaja, Estado) %>%
-      # Capturamos el rango específico de esa marca para mostrarlo en el título
-      summarise(
-        Cantidad = n(), 
-        RangoText = paste0("(", first(PesoF), " - ", first(Pesomaximo), " lb)"),
-        .groups = 'drop'
-      ) %>%
+      summarise(Cantidad = n(), .groups = 'drop') %>%
       group_by(Marcadecaja) %>%
       mutate(
-        Porcentaje = (Cantidad / sum(Cantidad)) * 100,
-        # Título dinámico para cada panel
-        EtiquetaPanel = paste(Marcadecaja, RangoText)
+        Porcentaje = round((Cantidad / sum(Cantidad)) * 100, 1),
+        Color = case_when(
+          Estado == "Óptimo" ~ "#5CB85C",    # Verde
+          Estado == "Exceso" ~ "#D9534F",    # Rojo
+          Estado == "Bajo Peso" ~ "#F0AD4E", # Naranja
+          TRUE ~ "#777777"
+        )
       )
     
-    # 3. Creación del gráfico con Facets
-    p <- ggplot(df_conteo, aes(x = Estado, y = Cantidad, fill = Estado,
-                               text = paste0("<b>", Marcadecaja, "</b>",
-                                             "<br><b>Cantidad:</b> ", Cantidad,
-                                             "<br><b>Porcentaje:</b> ", round(Porcentaje, 1), "%"))) +
-      geom_bar(stat = "identity", width = 0.7) +
-      geom_text(aes(label = paste0(Cantidad, " (", round(Porcentaje, 0), "%)")), 
-                vjust = -0.5, 
-                size = 3.5, 
-                fontface = "bold",
-                color = "#2c3e50") +
-      # Separamos por la nueva etiqueta que incluye el rango
-      facet_wrap(~EtiquetaPanel, scales = "free_x") + 
-      scale_fill_manual(values = colores_pro) +
-      theme_minimal() +
-      labs(title = NULL, x = NULL, y = "Cantidad de Cajas") +
-      theme(
-        strip.background = element_rect(fill = "#2c3e50", color = "#2c3e50"),
-        strip.text = element_text(face = "bold", size = 10, color = "white"),
-        legend.position = "none",
-        panel.spacing = unit(2, "lines"),
-        axis.text.x = element_text(face = "bold")
-      )
+    # 2. Crear la lista de gráficos (uno por marca)
+    marcas <- unique(df_listo$Marcadecaja)
     
-    # Convertir a Plotly y ajustar Layout
-    ggplotly(p, tooltip = "text") %>%
-      layout(
-        title = list(text = "<b>MONITOREO DE CALIDAD POR MARCA Y RANGO OBJETIVO</b>", x = 0, y = 0.98),
-        margin = list(t = 80, b = 40, l = 50, r = 20)
-      ) %>%
-      config(displayModeBar = FALSE)
+    lista_hc <- lapply(marcas, function(m) {
+      data_marca <- df_listo %>% filter(Marcadecaja == m)
+      
+      hchart(data_marca, "column", hcaes(x = Estado, y = Cantidad, color = Color)) %>%
+        hc_title(text = paste("Marca:", m)) %>%
+        hc_xAxis(title = list(text = "")) %>%
+        hc_yAxis(title = list(text = "Cajas")) %>%
+        hc_plotOptions(column = list(
+          dataLabels = list(
+            enabled = TRUE, 
+            format = "{point.y}<br>{point.Porcentaje}%",
+            style = list(fontSize = "11px")
+          )
+        )) %>%
+        hc_size(height = 350)
+    })
+    
+    # 3. Renderizar la rejilla (grid)
+    hw_grid(lista_hc, ncol = 2)
   })
   
   
-  ###############
+  
   ##############
-  #################
   #################
   #ESTE ES EL FITRADO POR DIA EL REACTIVO 
   
   # --- FILTRO REACTIVO POR FECHA ---
   # Este es el "cerebro" que conecta tu calendario con los datos
   # --- FILTRO REACTIVO POR FECHA ---
-  datos_cajas_filtrados <- reactive({
-    # 1. Usamos tu función de lectura actual
-    df <- datos_cajas_procesadas() 
-    
-    # 2. Seguridad: pedimos que existan los datos y el calendario
-    req(df, input$filtro_fecha_cajas)
-    
-    # 3. Filtro comparando solo Día/Mes/Año
-    df_filtrado <- df %>%
-      filter(as.Date(Fecha) == as.Date(input$filtro_fecha_cajas))
-    
-    return(df_filtrado)
+  # --- FILTRO (Asegurando que Plotly solo reciba Data) ---
+  # 3. El filtro ahora lee del contenedor 'data_storage'
+  # Creamos un valor reactivo aislado
+  mis_datos <- reactiveVal(data.frame())
+  
+  # Actualización cada 10 segundos
+  observe({
+    invalidateLater(10000)
+    nueva_data <- descargar_datos()
+    if (!is.null(nueva_data)) {
+      mis_datos(nueva_data) # Solo actualiza si hay datos reales
+    }
   })
   
+  # Filtro de fecha
+  datos_cajas_filtrados <- reactive({
+    df <- mis_datos()
+    req(nrow(df) > 0)
+    
+    # Limpieza de fechas para evitar errores de clase
+    df$Fecha <- as.Date(df$Fecha)
+    df_f <- df[df$Fecha == as.Date(input$filtro_fecha_cajas), ]
+    
+    return(as.data.frame(df_f))
+  })
   
 }
+
+
+
