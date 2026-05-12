@@ -1205,7 +1205,7 @@ server <- function(input, output, session) {
                     valueBoxOutput("box_total_cajas", width = 3),
                     valueBoxOutput("box_primera_caja", width = 3),
                     valueBoxOutput("box_ultima_caja", width = 3),
-                    valueBoxOutput("box_horas_procesadas", width = 3) 
+                    valueBoxOutput("box_tiempo_total", width = 3) 
                     
                     # <-- La nueva tarjeta
                   ),
@@ -3169,75 +3169,71 @@ server <- function(input, output, session) {
     valueBox(paste(promedio, "lb"), "PESO PROMEDIO", icon = icon("weight-hanging"), color = "blue")
   })
   
+  
+  
+
+  # 2. HORA ÚLTIMA CAJA
+  output$box_ultima_caja <- renderValueBox({
+    df <- datos_cajas_filtrados()
+    req(nrow(df) > 0)
+    
+    tiempos <- as.POSIXct(df$Fecha, format = "%d/%m/%Y %H:%M:%S")
+    fin <- max(tiempos[!is.na(tiempos)], na.rm = TRUE)
+    
+    valueBox(
+      value = format(fin, "%H:%M"), 
+      subtitle = "HORA ÚLTIMA CAJA", 
+      icon = icon("clock"),
+      color = "orange"
+    )
+  })
+  
+  # 3. TOTAL TIEMPO PROCESO
+  output$box_tiempo_total <- renderValueBox({
+    df <- datos_cajas_filtrados()
+    req(nrow(df) > 0)
+    
+    tiempos <- as.POSIXct(df$Fecha, format = "%d/%m/%Y %H:%M:%S")
+    tiempos_limpios <- tiempos[!is.na(tiempos)]
+    
+    inicio <- min(tiempos_limpios, na.rm = TRUE)
+    fin <- max(tiempos_limpios, na.rm = TRUE)
+    
+    dif <- as.numeric(difftime(fin, inicio, units = "mins"))
+    horas <- floor(dif / 60)
+    minutos <- round(dif %% 60)
+    
+    valueBox(
+      value = paste0(sprintf("%02d", horas), "h ", sprintf("%02d", minutos), "m"),
+      subtitle = "TOTAL TIEMPO PROCESO", 
+      icon = icon("stopwatch"),
+      color = "purple"
+    )
+  })
+  
+  # 2. HORA DE LA PRIMERA CAJA (Inicio)
   # 2. HORA DE LA PRIMERA CAJA (Inicio)
   output$box_primera_caja <- renderValueBox({
     df <- datos_cajas_filtrados()
     req(nrow(df) > 0)
     
-    # Buscamos la fecha/hora más antigua
-    inicio <- min(as.POSIXct(df$Fecha), na.rm = TRUE)
-    
+    # ✅ CORRECCIÓN: Le decimos el formato exacto de tu Excel
+    tiempos <- as.POSIXct(df$Fecha, format = "%d/%m/%Y %H:%M:%S")
+    inicio <- min(tiempos, na.rm = TRUE)
     
     valueBox(
       value = format(inicio, "%H:%M"), 
       subtitle = "HORA PRIMERA CAJA", 
-      icon("clock-rotate-left"),
+      icon = icon("clock-rotate-left"),
       color = "blue"
     )
   })
-  
-  
-  # 3. HORA DE LA ÚLTIMA CAJA (Fin)
-  output$box_ultima_caja <- renderValueBox({
-    df <- datos_cajas_filtrados()
-    req(nrow(df) > 0)
-    
-    # Buscamos la fecha/hora más reciente
-    fin <- max(as.POSIXct(df$Fecha), na.rm = TRUE)
-    
-    valueBox(
-      value = format(fin, "%H:%M"), 
-      subtitle = "HORA ÚLTIMA CAJA", 
-      icon("clock-check"), 
-      color = "orange"
-    )
-  })
-  
-  
-  # 4. TOTAL DE HORAS PROCESADAS (Diferencia entre primera y última)
-  output$box_horas_procesadas <- renderValueBox({
-    df <- datos_cajas_filtrados()
-    req(nrow(df) > 0)
-    
-    # Convertimos a formato fecha/hora asegurando el formato
-    tiempos <- as.POSIXct(df$Fecha)
-    
-    inicio <- min(tiempos, na.rm = TRUE)
-    fin <- max(tiempos, na.rm = TRUE)
-    
-    # Calculamos la diferencia total en minutos
-    minutos_totales <- as.numeric(difftime(fin, inicio, units = "mins"))
-    
-    # Calculamos horas y minutos por separado como ENTEROS
-    horas <- as.integer(minutos_totales %/% 60)
-    minutos <- as.integer(minutos_totales %% 60)
-    
-    # Formateamos usando %02d de forma segura
-    tiempo_texto <- sprintf("%02dh %02dm", horas, minutos)
-    
-    valueBox(
-      value = tiempo_texto, 
-      subtitle = "TOTAL TIEMPO PROCESO", 
-      icon("stopwatch-20"), 
-      color = "purple"
-    )
-  })
+
+
   
   
   
-  
-  
-  
+ 
   #####TASBLA
   
   
@@ -3430,17 +3426,32 @@ server <- function(input, output, session) {
     }
   })
   
-  # Filtro de fecha
+                            # # Filtro de fecha
+                            # datos_cajas_filtrados <- reactive({
+                            #   df <- mis_datos()
+                            #   req(nrow(df) > 0)
+                            # 
+                            #   # Limpieza de fechas para evitar errores de clase
+                            #   df$Fecha <- as.Date(df$Fecha)
+                            #   df_f <- df[df$Fecha == as.Date(input$filtro_fecha_cajas), ]
+                            # 
+                            #   return(as.data.frame(df_f))
+                            # })
+  
+  # --- FILTRO DE FECHA CORREGIDO ---
   datos_cajas_filtrados <- reactive({
     df <- mis_datos()
     req(nrow(df) > 0)
     
-    # Limpieza de fechas para evitar errores de clase
-    df$Fecha <- as.Date(df$Fecha)
-    df_f <- df[df$Fecha == as.Date(input$filtro_fecha_cajas), ]
+    # 1. NO uses as.Date directamente sobre la columna original porque borras la hora
+    # Creamos una columna temporal para el filtro, pero mantenemos la original intacta
+    df_f <- df[as.Date(df$Fecha, format = "%d/%m/%Y") == as.Date(input$filtro_fecha_cajas), ]
     
     return(as.data.frame(df_f))
   })
+  
+  
+  
   
 }
 
