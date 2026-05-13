@@ -1195,7 +1195,26 @@ server <- function(input, output, session) {
                                         class = "btn-primary no-print", 
                                         style = "margin-top: 25px;",
                                         onclick = "window.print();")
-                    )
+                    ),
+                    
+                    # Agrega esto en tu sidebar o panel de 
+                    
+                    
+
+                    
+                    
+                    uiOutput("selector_finca_dinamico"),
+                    
+                    
+                    
+                    
+                    selectInput("filtro_empacadora", "Seleccionar Empacadora:", 
+                                choices = NULL, selected = NULL)
+                    
+                    
+                    
+                    
+                    
                   ),
                   br(),
                   
@@ -3437,20 +3456,103 @@ server <- function(input, output, session) {
                             # 
                             #   return(as.data.frame(df_f))
                             # })
+  ##########################################################################################################
+                              # # --- FILTRO DE FECHA CORREGIDO ---
+                              # datos_cajas_filtrados <- reactive({
+                              #   df <- mis_datos()
+                              #   req(nrow(df) > 0)
+                              # 
+                              #   # 1. NO uses as.Date directamente sobre la columna original porque borras la hora
+                              #   # Creamos una columna temporal para el filtro, pero mantenemos la original intacta
+                              #   df_f <- df[as.Date(df$Fecha, format = "%d/%m/%Y") == as.Date(input$filtro_fecha_cajas), ]
+                              # 
+                              #   return(as.data.frame(df_f))
+                              # })
+
+  #########################################################################
   
-  # --- FILTRO DE FECHA CORREGIDO ---
   datos_cajas_filtrados <- reactive({
     df <- mis_datos()
-    req(nrow(df) > 0)
+
     
-    # 1. NO uses as.Date directamente sobre la columna original porque borras la hora
-    # Creamos una columna temporal para el filtro, pero mantenemos la original intacta
-    df_f <- df[as.Date(df$Fecha, format = "%d/%m/%Y") == as.Date(input$filtro_fecha_cajas), ]
+        # Si no hay nada, devolvemos un dataframe vacío pero con la estructura
+    if (is.null(df) || nrow(df) == 0) return(data.frame())
+    
+    
+    req(input$filtro_finca)
+    
+    # 1. Filtro de Fecha
+    fecha_sel <- as.Date(input$filtro_fecha_cajas)
+    # Convertimos la fecha de la base asegurando que sea Date
+    df_f <- df[as.Date(df$Fecha) == fecha_sel, ]
+    
+    # Si no hay datos para ese día, cortamos aquí
+    if (nrow(df_f) == 0) return(df_f)
+    
+    # 2. Filtro Finca (Solo si el input existe y no es Todas)
+    # Agregamos checks para evitar que el NULL bloquee el gráfico
+  
+    if (input$filtro_finca != "Todas") {
+      df_f <- df_f[df_f$HACIENDA == input$filtro_finca, ]
+    }
+    # 3. Filtro Empacadora
+    emp_sel <- input$filtro_empacadora
+    if (!is.null(emp_sel) && emp_sel != "" && emp_sel != "Todas") {
+      df_f <- df_f[df_f$EMPACADORA == emp_sel, ]
+    }
     
     return(as.data.frame(df_f))
   })
   
+  ##############ESTE OBSERVER ES PARA CARGAR DATOS EN L EFILTRO HACIENDA EN CAJS EN LINEA 
   
+  # Actualizar opciones de Hacienda al cargar datos
+  # --- 1. CARGAR HACIENDAS (Se activa cuando mis_datos tiene contenido) ---
+  # --- ACTUALIZAR HACIENDA ---
+  # --- CARGAR HACIENDAS ---
+  
+  # --- CARGADOR FORZADO DE HACIENDAS ---
+  # --- CARGADOR DE HACIENDAS (VERSIÓN FINAL) ---
+  
+  # --- RENDERIZADO DINÁMICO DEL FILTRO ---
+  output$selector_finca_dinamico <- renderUI({
+    df <- mis_datos()
+    
+    # Si no hay datos, mostramos un mensaje de espera
+    if (is.null(df) || nrow(df) == 0) {
+      return(selectInput("filtro_finca", "Seleccionar Hacienda:", choices = "Cargando..."))
+    }
+    
+    # Extraemos las haciendas reales
+    lista_haciendas <- unique(as.character(df$HACIENDA))
+    lista_haciendas <- lista_haciendas[!is.na(lista_haciendas) & lista_haciendas != ""]
+    
+    # Creamos el selector con los datos ya cargados
+    selectInput(
+      inputId = "filtro_finca", 
+      label = "Seleccionar Hacienda:", 
+      choices = c("Todas", lista_haciendas),
+      selected = "Todas"
+    )
+  })
+  
+  
+  # --- 2. CARGAR EMPACADORAS (Depende de la Hacienda seleccionada) ---
+  observeEvent(input$filtro_finca, {
+    df <- mis_datos()
+    req(nrow(df) > 0)
+    
+    if (input$filtro_finca == "Todas") {
+      empacadoras <- unique(as.character(df$EMPACADORA))
+    } else {
+      empacadoras <- df[df$HACIENDA == input$filtro_finca, ]$EMPACADORA
+      empacadoras <- unique(as.character(empacadoras))
+    }
+    
+    updateSelectInput(session, "filtro_empacadora", 
+                      choices = c("Todas", empacadoras), 
+                      selected = "Todas")
+  })
   
   
 }
