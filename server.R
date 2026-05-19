@@ -3368,7 +3368,73 @@ server <- function(input, output, session) {
   
   ##############
   #################
+  ################### ESTE ES EL SEGUNDO CODIGO SI FUNCIONA 
   
+  # output$contenedor_graficos <- renderUI({
+  #   df_raw <- datos_cajas_filtrados()
+  # 
+  #   # Si aún no hay datos, mostrar un mensaje de carga
+  #   if (is.null(df_raw) || nrow(df_raw) == 0) {
+  #     return(h4("Cargando datos desde Excel...", style = "color: grey; text-align: center; padding: 50px;"))
+  #   }
+  # 
+  #   # 1. Procesar datos
+  #   df_listo <- df_raw %>%
+  #     mutate(Estado = case_when(
+  #       Pesoneto > Pesomaximo ~ "Exceso",
+  #       Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Óptimo",
+  #       Pesoneto < PesoF ~ "Bajo Peso",
+  #       TRUE ~ "Otros"
+  #     )) %>%
+  #     group_by(Marcadecaja, Estado) %>%
+  #     summarise(Cantidad = n(), .groups = 'drop') %>%
+  #     group_by(Marcadecaja) %>%
+  #     mutate(
+  #       Porcentaje = round((Cantidad / sum(Cantidad)) * 100, 1),
+  #       Color = case_when(
+  #         Estado == "Óptimo" ~ "#5CB85C",    # Verde
+  #         Estado == "Exceso" ~ "#D9534F",    # Rojo
+  #         Estado == "Bajo Peso" ~ "#F0AD4E", # Naranja
+  #         TRUE ~ "#777777"
+  #       )
+  #     )
+  # 
+  #   # 2. Crear la lista de gráficos (uno por marca)
+  #   marcas <- unique(df_listo$Marcadecaja)
+  # 
+  #   lista_hc <- lapply(marcas, function(m) {
+  #     data_marca <- df_listo %>% filter(Marcadecaja == m)
+  # 
+  #     hchart(data_marca, "column", hcaes(x = Estado, y = Cantidad, color = Color)) %>%
+  #       hc_title(text = paste("Marca:", m)) %>%
+  #       hc_xAxis(title = list(text = "")) %>%
+  #       hc_yAxis(title = list(text = "Cajas")) %>%
+  #       hc_plotOptions(column = list(
+  #         dataLabels = list(
+  #           enabled = TRUE,
+  #           format = "{point.y}<br>{point.Porcentaje}%",
+  #           style = list(fontSize = "11px")
+  #         )
+  #       )) %>%
+  #       hc_size(height = 350)
+  #   })
+  # 
+  #   # 3. Renderizar la rejilla (grid)
+  #   hw_grid(lista_hc, ncol = 2)
+  # })
+
+  #################
+  ##################
+  ################
+  ############
+  
+  
+  
+  
+  #################
+  ##################
+  #################
+  #########################
   output$contenedor_graficos <- renderUI({
     df_raw <- datos_cajas_filtrados()
     
@@ -3377,53 +3443,282 @@ server <- function(input, output, session) {
       return(h4("Cargando datos desde Excel...", style = "color: grey; text-align: center; padding: 50px;"))
     }
     
-    # 1. Procesar datos
-    df_listo <- df_raw %>%
-      mutate(Estado = case_when(
-        Pesoneto > Pesomaximo ~ "Exceso",
-        Pesoneto >= PesoF & Pesoneto <= Pesomaximo ~ "Óptimo",
-        Pesoneto < PesoF ~ "Bajo Peso",
-        TRUE ~ "Otros"
-      )) %>%
-      group_by(Marcadecaja, Estado) %>%
-      summarise(Cantidad = n(), .groups = 'drop') %>%
-      group_by(Marcadecaja) %>%
-      mutate(
-        Porcentaje = round((Cantidad / sum(Cantidad)) * 100, 1),
-        Color = case_when(
-          Estado == "Óptimo" ~ "#5CB85C",    # Verde
-          Estado == "Exceso" ~ "#D9534F",    # Rojo
-          Estado == "Bajo Peso" ~ "#F0AD4E", # Naranja
-          TRUE ~ "#777777"
-        )
-      )
+    # Limpiar datos vacíos de peso para que no rompa el cálculo matemático
+    df_raw <- df_raw[!is.na(df_raw$Pesoneto), ]
+    if (nrow(df_raw) == 0) {
+      return(h4("No hay registros con pesos válidos.", style = "color: grey; text-align: center; padding: 50px;"))
+    }
     
-    # 2. Crear la lista de gráficos (uno por marca)
-    marcas <- unique(df_listo$Marcadecaja)
+    # Obtener las marcas únicas que tienen datos
+    marcas <- unique(df_raw$Marcadecaja)
+    marcas <- marcas[!is.na(marcas) & marcas != ""]
     
+    # 1. Crear la lista de gráficos (un histograma de rangos por cada marca)
     lista_hc <- lapply(marcas, function(m) {
-      data_marca <- df_listo %>% filter(Marcadecaja == m)
+      # Filtrar datos únicamente de la marca actual
+      df_marca <- df_raw %>% filter(Marcadecaja == m)
       
-      hchart(data_marca, "column", hcaes(x = Estado, y = Cantidad, color = Color)) %>%
-        hc_title(text = paste("Marca:", m)) %>%
-        hc_xAxis(title = list(text = "")) %>%
+      # --- BLINDAJE 1: Si la marca tiene menos de 2 filas, evitamos colapso ---
+      if (nrow(df_marca) < 2) return(NULL)
+      
+      # ---- 📌 EXTRACCIÓN DE PARÁMETROS OPERATIVOS DESDE LA BASE ----
+      p_min_ok <- df_marca$PesoF[1]
+      p_max_ok <- df_marca$Pesomaximo[1]
+      
+      # Valores de respaldo por si esa celda específica en la base de datos viene vacía
+      if (is.null(p_min_ok) || is.na(p_min_ok) || length(p_min_ok) == 0) p_min_ok <- 31.5
+      if (is.null(p_max_ok) || is.na(p_max_ok) || length(p_max_ok) == 0) p_max_ok <- 32.3
+      
+      # ---- 📌 CONSTRUCCIÓN DE CORTES MATEMÁTICOS SIMÉTRICOS ----
+      # Aquí calculamos el ancho permitido por tu base de datos (Ej: 32.3 - 31.5 = 0.8)
+      rango_tolerancia <- p_max_ok - p_min_ok
+      
+      # Creamos 5 rangos fijos donde el del centro siempre será exactamente [p_min_ok - p_max_ok]
+      # Rango 1: Muy Bajo peso
+      # Rango 2: Bajo peso (Naranja)
+      # Rango 3: Peso Óptimo (Verde) -> Siempre será exactamente entre p_min_ok y p_max_ok
+      # Rango 4: Exceso de peso (Rojo)
+      # Rango 5: Muy Alto peso
+      cortes <- c(
+        p_min_ok - (rango_tolerancia * 2),
+        p_min_ok - rango_tolerancia,
+        p_min_ok,
+        p_max_ok,
+        p_max_ok + rango_tolerancia,
+        p_max_ok + (rango_tolerancia * 2)
+      )
+      
+      # Asignamos las etiquetas legibles
+      etiquetas <- sprintf("[%.2f - %.2f]", cortes[-length(cortes)], cortes[-1])
+      df_marca$Rango <- cut(df_marca$Pesoneto, breaks = cortes, labels = etiquetas, include.lowest = TRUE)
+      
+      # ---- AGRUPACIÓN Y CONTEO ----
+      df_resumen <- df_marca %>%
+        filter(!is.na(Rango)) %>% # Ignorar pesajes extremadamente atípicos fuera de los límites extendidos
+        group_by(Rango) %>%
+        summarise(
+          Cantidad = n(),
+          .groups = 'drop'
+        )
+      
+      # --- BLINDAJE 2: Evitar tablas vacías ---
+      if (nrow(df_resumen) == 0) return(NULL)
+      
+      # Completar rangos vacíos con 0 cajas si es necesario para mantener la simetría visual
+      todos_los_rangos <- data.frame(Rango = factor(etiquetas, levels = etiquetas))
+      df_resumen <- todos_los_rangos %>% 
+        left_join(df_resumen, by = "Rango") %>% 
+        mutate(Cantidad = ifelse(is.na(Cantidad), 0, Cantidad))
+      
+      df_resumen <- df_resumen %>%
+        mutate(
+          Rango_Str = as.character(Rango),
+          Porcentaje = if(sum(Cantidad) > 0) round((Cantidad / sum(Cantidad)) * 100, 1) else 0
+        )
+      
+      # ---- 📌 ASIGNACIÓN EXACTA DEL COLOR SEGÚN LA BASE DE DATOS ----
+      df_resumen$Color <- sapply(df_resumen$Rango_Str, function(rango_texto) {
+        limites <- as.numeric(gsub("[^0-9.]", "", unlist(strsplit(rango_texto, "-"))))
+        if(length(limites) < 2) return("#777777")
+        
+        limite_inf <- limites[1]
+        limite_sup <- limites[2]
+        
+        # Si el inicio y fin de la barra coinciden exactamente con p_min y p_max, es VERDE
+        if (abs(limite_inf - p_min_ok) < 0.01 && abs(limite_sup - p_max_ok) < 0.01) {
+          return("#5CB85C") # Verde: Rango Óptimo Estricto de la base
+        } else if (limite_sup <= p_min_ok) {
+          return("#F0AD4E") # Naranja: Segmentos por debajo del mínimo de la base
+        } else {
+          return("#D9534F") # Rojo: Segmentos por encima del máximo de la base
+        }
+      })
+      
+      # ---- CONSTRUCCIÓN DEL GRÁFICO ----
+      highchart() %>%
+        hc_chart(type = "column") %>%
+        hc_title(text = paste("<b>Marca:</b>", m), 
+                 style = list(fontFamily = "Poppins", fontSize = "14px", color = "#003e6b")) %>%
+        hc_xAxis(categories = df_resumen$Rango_Str, 
+                 labels = list(style = list(fontSize = "11px", fontWeight = "bold"))) %>%
         hc_yAxis(title = list(text = "Cajas")) %>%
         hc_plotOptions(column = list(
+          colorByPoint = TRUE,
           dataLabels = list(
-            enabled = TRUE, 
+            enabled = TRUE,
+            inside = TRUE,             
+            verticalAlign = "middle",  
             format = "{point.y}<br>{point.Porcentaje}%",
-            style = list(fontSize = "11px")
+            style = list(
+              fontSize = "12px", 
+              fontWeight = "bold", 
+              color = "#FFFFFF",       
+              textOutline = "1px solid #333333" 
+            )
           )
         )) %>%
-        hc_size(height = 350)
+        hc_add_series(
+          data = df_resumen,
+          type = "column",
+          mapping = hcaes(x = Rango_Str, y = Cantidad, color = Color, Porcentaje = Porcentaje)
+        ) %>%
+        hc_legend(enabled = FALSE) %>%
+        hc_size(height = 360)
     })
     
-    # 3. Renderizar la rejilla (grid)
+    # --- BLINDAJE 3: Limpieza de elementos nulos ---
+    lista_hc <- lista_hc[!sapply(lista_hc, is.null)]
+    
+    if(length(lista_hc) == 0) {
+      return(h4("No hay suficientes datos estables para generar gráficos por rangos.", style = "color: grey; text-align: center; padding: 50px;"))
+    }
+    
+    # 3. Renderizar la rejilla (grid) con 2 columnas
     hw_grid(lista_hc, ncol = 2)
   })
+ 
+  ###################
+  #################
+  ###################
+  #################
+  ##############
   
   
+  # output$contenedor_graficos <- renderUI({
+  #   df_raw <- datos_cajas_filtrados()
+  #   
+  #   # Si aún no hay datos, mostrar un mensaje de carga
+  #   if (is.null(df_raw) || nrow(df_raw) == 0) {
+  #     return(h4("Cargando datos desde Excel...", style = "color: grey; text-align: center; padding: 50px;"))
+  #   }
+  #   
+  #   # Limpiar datos vacíos de peso para que no rompa el cálculo matemático
+  #   df_raw <- df_raw[!is.na(df_raw$Pesoneto), ]
+  #   if (nrow(df_raw) == 0) {
+  #     return(h4("No hay registros con pesos válidos.", style = "color: grey; text-align: center; padding: 50px;"))
+  #   }
+  #   
+  #   # Obtener las marcas únicas que tienen datos
+  #   marcas <- unique(df_raw$Marcadecaja)
+  #   marcas <- marcas[!is.na(marcas) & marcas != ""]
+  #   
+  #   # 1. Crear la lista de gráficos (un histograma de rangos por cada marca)
+  #   lista_hc <- lapply(marcas, function(m) {
+  #     # Filtrar datos únicamente de la marca actual
+  #     df_marca <- df_raw %>% filter(Marcadecaja == m)
+  #     
+  #     # --- BLINDAJE 1: Si la marca tiene menos de 2 filas, evitamos colapso ---
+  #     if (nrow(df_marca) < 2) return(NULL)
+  #     
+  #     # ---- CÁLCULO DE INTERVALOS DE PESO (RANGOS) ----
+  #     num_clases <- 5
+  #     min_p <- min(df_marca$Pesoneto, na.rm = TRUE)
+  #     max_p <- max(df_marca$Pesoneto, na.rm = TRUE)
+  #     
+  #     if(min_p == max_p) {
+  #       cortes <- c(min_p - 0.5, min_p + 0.5)
+  #     } else {
+  #       cortes <- seq(min_p, max_p, length.out = num_clases + 1)
+  #     }
+  #     
+  #     etiquetas <- sprintf("[%.2f - %.2f]", cortes[-length(cortes)], cortes[-1])
+  #     df_marca$Rango <- cut(df_marca$Pesoneto, breaks = cortes, labels = etiquetas, include.lowest = TRUE)
+  #     
+  #     # ---- 📌 AQUÍ SE EXTRAN LAS COLUMNAS DE LA BASE DE DATOS ----
+  #     # Extraemos directamente el valor de la primera fila real de esta marca para evitar promedios erróneos
+  #     p_min_ok <- df_marca$PesoF[1]
+  #     p_max_ok <- df_marca$Pesomaximo[1]
+  #     
+  #     # Valores de respaldo de emergencia si el Excel viene vacío para esa celda
+  #     if (is.null(p_min_ok) || is.na(p_min_ok) || length(p_min_ok) == 0) p_min_ok <- 31.5
+  #     if (is.null(p_max_ok) || is.na(p_max_ok) || length(p_max_ok) == 0) p_max_ok <- 32.3
+  #     
+  #     # ---- AGRUPACIÓN Y CONTEO ----
+  #     df_resumen <- df_marca %>%
+  #       group_by(Rango) %>%
+  #       summarise(
+  #         Cantidad = n(),
+  #         .groups = 'drop'
+  #       )
+  #     
+  #     # --- BLINDAJE 2: Evitar tablas vacías ---
+  #     if (nrow(df_resumen) == 0) return(NULL)
+  #     
+  #     df_resumen <- df_resumen %>%
+  #       mutate(
+  #         Rango_Str = as.character(Rango),
+  #         Porcentaje = round((Cantidad / sum(Cantidad)) * 100, 1)
+  #       )
+  #     
+  #     # ---- 📌 AQUÍ SE MODIFICA LA LÓGICA DE LOS TRES COLORES ----
+  #     df_resumen$Color <- sapply(df_resumen$Rango_Str, function(rango_texto) {
+  #       # Removemos corchetes y separamos los dos límites: ejemplo "[31.77 - 32.54]" -> 31.77 y 32.54
+  #       limites <- as.numeric(gsub("[^0-9.]", "", unlist(strsplit(rango_texto, "-"))))
+  #       if(length(limites) < 2) return("#777777")
+  #       
+  #       limite_inferior_barra <- limites[1]
+  #       limite_superior_barra <- limites[2]
+  #       
+  #       # LÓGICA DE CONTROL OPERATIVO:
+  #       # Si el rango de la barra intersecta o está predominantemente dentro del rango objetivo
+  #       # Usamos el punto medio de la barra para una clasificación exacta
+  #       punto_medio <- (limite_inferior_barra + limite_superior_barra) / 2
+  #       
+  #       if (punto_medio >= p_min_ok && punto_medio <= p_max_ok) {
+  #         return("#5CB85C") # Verde: Peso Óptimo (Mayor a PesoF y menor a Pesomaximo)
+  #       } else if (punto_medio < p_min_ok) {
+  #         return("#F0AD4E") # Naranja: Bajo Peso (Menor a lo estipulado en la base)
+  #       } else {
+  #         return("#D9534F") # Rojo: Exceso de peso (Mayor al límite permitido)
+  #       }
+  #     })
+  #     
+  #     # ---- CONSTRUCCIÓN DEL GRÁFICO ----
+  #     highchart() %>%
+  #       hc_chart(type = "column") %>%
+  #       hc_title(text = paste("<b>Marca:</b>", m), 
+  #                style = list(fontFamily = "Poppins", fontSize = "14px", color = "#003e6b")) %>%
+  #       hc_xAxis(categories = df_resumen$Rango_Str, 
+  #                labels = list(style = list(fontSize = "11px", fontWeight = "bold"))) %>%
+  #       hc_yAxis(title = list(text = "Cajas")) %>%
+  #       hc_plotOptions(column = list(
+  #         colorByPoint = TRUE,
+  #         dataLabels = list(
+  #           enabled = TRUE,
+  #           inside = TRUE,             
+  #           verticalAlign = "middle",  
+  #           format = "{point.y}<br>{point.Porcentaje}%",
+  #           style = list(
+  #             fontSize = "12px", 
+  #             fontWeight = "bold", 
+  #             color = "#FFFFFF",       
+  #             textOutline = "1px solid #333333" 
+  #           )
+  #         )
+  #       )) %>%
+  #       hc_add_series(
+  #         data = df_resumen,
+  #         type = "column",
+  #         mapping = hcaes(x = Rango_Str, y = Cantidad, color = Color, Porcentaje = Porcentaje)
+  #       ) %>%
+  #       hc_legend(enabled = FALSE) %>%
+  #       hc_size(height = 360)
+  #   })
+  #   
+  #   # --- BLINDAJE 3: Limpieza de elementos nulos en R Base ---
+  #   lista_hc <- lista_hc[!sapply(lista_hc, is.null)]
+  #   
+  #   if(length(lista_hc) == 0) {
+  #     return(h4("No hay suficientes datos estables para generar gráficos por rangos.", style = "color: grey; text-align: center; padding: 50px;"))
+  #   }
+  #   
+  #   # 3. Renderizar la rejilla (grid) con 2 columnas
+  #   hw_grid(lista_hc, ncol = 2)
+  # })
+  # 
   
+  
+  ###############
   ##############
   #################
   #ESTE ES EL FITRADO POR DIA EL REACTIVO 
