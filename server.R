@@ -16,6 +16,11 @@ library(httr)
 library(highcharter)
 library(htmltools)
 
+library(googledrive)
+
+# Desactivar la autenticación interactiva para que Posit Connect no busque pantallas humanas
+drive_auth(path = "dashboard-cajas-496915-7be6a08df01d.json")
+
 
 # 
 # # Carga del nuevo maestro de cajas  ESTO ES formulario cajas en linea
@@ -37,31 +42,57 @@ library(htmltools)
 # --- CARGA DESDE GOOGLE DRIVE (SÚPER ESTABLE) ---
 # --- CARGA BLINDADA DESDE GOOGLE DRIVE ---
 # --- CARGA POR DESCARGA DIRECTA (SIN OBJETOS REQUEST) ---
-# 1. Función para descargar el archivo (Fuera de cualquier reactivo)
+# 1. Función para descargar el archivo (Fuera de cualquier reactivo)   esta funcion descrgar archivo es la que fuinciona con excell
+# descargar_datos <- function() {
+#   file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
+#   url <- paste0("https://docs.google.com/spreadsheets/d/", file_id, "/export?format=xlsx")
+#   tf <- tempfile(fileext = ".xlsx")
+#   
+#   tryCatch({
+#     download.file(url, tf, mode = "wb", quiet = TRUE)
+#     if (file.exists(tf)) {
+#       df <- readxl::read_excel(tf)
+#       return(as.data.frame(df))
+#     }
+#   }, error = function(e) return(NULL))
+#   return(NULL)
+# }
+# 
+# 
+######################################
+##########################
+
+# --- NUEVA CARGA AUTOMÁTICA DESDE GOOGLE DRIVE CON CUENTA DE SERVICIO ---
+# --- NUEVA CARGA AUTOMÁTICA DESDE GOOGLE DRIVE CON CUENTA DE SERVICIO ---
 descargar_datos <- function() {
-  file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
-  url <- paste0("https://docs.google.com/spreadsheets/d/", file_id, "/export?format=xlsx")
-  tf <- tempfile(fileext = ".xlsx")
+  # ID único de tu archivo de Google Drive
+  file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj" [cite: 2]
+  
+  # Creamos un archivo temporal seguro en el servidor para procesar la lectura
+  tf <- tempfile(fileext = ".xlsx") [cite: 2]123
   
   tryCatch({
-    download.file(url, tf, mode = "wb", quiet = TRUE)
-    if (file.exists(tf)) {
-      df <- readxl::read_excel(tf)
-      return(as.data.frame(df))
+    # drive_download descargará el archivo utilizando la autenticación del JSON de forma invisible
+    drive_download(
+      as_id(file_id),
+      path = tf,
+      overwrite = TRUE,
+      verbose = FALSE
+    )
+    
+    if (file.exists(tf)) { 
+      df <- readxl::read_excel(tf) 
+      return(as.data.frame(df)) 
     }
-  }, error = function(e) return(NULL))
-  return(NULL)
+  }, error = function(e) {
+    warning(paste("Error en la descarga autónoma de Google Drive:", e$message))
+    return(NULL) 
+  })
+  return(NULL) 
 }
 
-
-
-
-
-
-
-
-
-
+###########
+#########################
 
 # --- CARGA DE DATOS MAESTROS ---
 # Nota: Ajusta las rutas si los archivos están dentro de una carpeta específica
