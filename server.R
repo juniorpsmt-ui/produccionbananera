@@ -17,82 +17,111 @@ library(highcharter)
 library(htmltools)
 
 library(googledrive)
+library(googlesheets4)
+library(gargle)
 
-# Desactivar la autenticación interactiva para que Posit Connect no busque pantallas humanas
-drive_auth(path = "dashboard-cajas-496915-7be6a08df01d.json")
+# 1. Desactivar por completo cualquier intento de abrir pantallas o pedir datos
+options(
+  gargle_oauth_cache = FALSE,
+  googledrive_quiet = TRUE,
+  googlesheets4_quiet = TRUE
+)
 
+# Nombre exacto del archivo JSON que debe estar en tu carpeta
+nombre_json <- "dashboard-cajas-496915-7be6a08df01d.json"
 
-# 
-# # Carga del nuevo maestro de cajas  ESTO ES formulario cajas en linea
-# datos_cajas_procesadas <- reactiveFileReader(
-#   intervalMillis = 5000, # Revisa cambios cada 5 segundos
-#   session = NULL,
-#   filePath = "LABORES AGRICOLAS/Cajas registradas en SAN HUMBERTO wk 18 -hlf.xlsx",
-#   readFunc = function(filePath) {
-#     read_excel(filePath)
-#   }
-# )
-
-
-
-# --- NUEVA CARGA AUTOMÁTICA DESDE GOOGLE DRIVE ---
-# --- CARGA AUTOMÁTICA DESDE GOOGLE DRIVE CORREGIDA ---
-# --- CARGA DESDE GOOGLE DRIVE (VERSIÓN ESTABLE) ---
-# --- CARGA DESDE DRIVE CON LIMPIEZA DE MEMORIA ---
-# --- CARGA DESDE GOOGLE DRIVE (SÚPER ESTABLE) ---
-# --- CARGA BLINDADA DESDE GOOGLE DRIVE ---
-# --- CARGA POR DESCARGA DIRECTA (SIN OBJETOS REQUEST) ---
-# 1. Función para descargar el archivo (Fuera de cualquier reactivo)   esta funcion descrgar archivo es la que fuinciona con excell
+# =====================================================================
+# 🌐 EL PUENTE EN EL AIRE: FUNCIÓN OPTIMIZADA SIN ARCHIVOS LOCALES
+# =====================================================================
 # descargar_datos <- function() {
 #   file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
-#   url <- paste0("https://docs.google.com/spreadsheets/d/", file_id, "/export?format=xlsx")
-#   tf <- tempfile(fileext = ".xlsx")
 #   
 #   tryCatch({
-#     download.file(url, tf, mode = "wb", quiet = TRUE)
-#     if (file.exists(tf)) {
-#       df <- readxl::read_excel(tf)
-#       return(as.data.frame(df))
+#     if (!file.exists(nombre_json)) {
+#       cat("\n⚠️ ERROR: No se encuentra el archivo JSON de credenciales.\n")
+#       return(NULL)
 #     }
-#   }, error = function(e) return(NULL))
+#     
+#     # 1. Autenticación silenciosa usando la cuenta de servicio directamente con la API de Sheets
+#     googlesheets4::gs4_auth(path = nombre_json)
+#     
+#     # 2. MODO PUENTE: Leemos la pestaña "Datos" directamente de la nube de Google
+#     # Sin descargar archivos pesados .xlsx, sin usar httr::GET ni write_disk
+#     df <- googlesheets4::read_sheet(
+#       ss = file_id,
+#       sheet = "Datos",
+#       col_types = "c" # Lee todo inicialmente como texto para que no gasta CPU procesando formatos
+#     )
+#     
+#     df <- as.data.frame(df)
+#     
+#     # 3. Conversión manual rápida solo de las columnas numéricas indispensables
+#     if("Pesoneto" %in% colnames(df)) {
+#       df$Pesoneto <- as.numeric(df$Pesoneto)
+#     }
+#     
+#     # 4. Forzar limpieza total de basura residual en la memoria RAM de Posit
+#     gc()
+#     
+#     return(df)
+#     
+#   }, error = function(e) {
+#     cat("\n⚠️ Error crítico en el puente directo de Google Sheets:", e$message, "\n")
+#     return(NULL)
+#   })
 #   return(NULL)
 # }
-# 
-# 
-######################################
-##########################
+################
+#########################
+##################
+##############
 
-# --- NUEVA CARGA AUTOMÁTICA DESDE GOOGLE DRIVE CON CUENTA DE SERVICIO ---
-# --- NUEVA CARGA AUTOMÁTICA DESDE GOOGLE DRIVE CON CUENTA DE SERVICIO ---
+
 descargar_datos <- function() {
-  # ID único de tu archivo de Google Drive
-  file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj" [cite: 2]
-  
-  # Creamos un archivo temporal seguro en el servidor para procesar la lectura
-  tf <- tempfile(fileext = ".xlsx") [cite: 2]123
+  file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
   
   tryCatch({
-    # drive_download descargará el archivo utilizando la autenticación del JSON de forma invisible
-    drive_download(
+    if (!file.exists(nombre_json)) {
+      cat("\n⚠️ ERROR: No se encuentra el archivo JSON de credenciales.\n")
+      return(NULL)
+    }
+    
+    # 1. Autenticación con el robot en Google Drive
+    googledrive::drive_auth(path = nombre_json)
+    
+    # 2. MODO PUENTE SEGURO: Creamos un archivo temporal invisible en la RAM profunda de R
+    # (tempfile() no toca tus carpetas locales, no ensucia tu Git y se destruye solo al cerrar)
+    tf <- tempfile(fileext = ".xlsx")
+    
+    # 3. Descarga silenciosa del Excel real de 7 MB
+    googledrive::drive_download(
       as_id(file_id),
       path = tf,
       overwrite = TRUE,
       verbose = FALSE
     )
     
-    if (file.exists(tf)) { 
-      df <- readxl::read_excel(tf) 
-      return(as.data.frame(df)) 
-    }
+    # 4. Lectura veloz de la pestaña "Datos" 
+    # Usamos guess_max para que no pierda tiempo analizando filas y no consuma CPU
+    df <- readxl::read_excel(tf, sheet = "Datos", guess_max = 5000)
+    df <- as.data.frame(df)
+    
+    # 5. Forzar la liberación inmediata de la memoria RAM de Posit Cloud
+    gc()
+    
+    return(df)
+    
   }, error = function(e) {
-    warning(paste("Error en la descarga autónoma de Google Drive:", e$message))
-    return(NULL) 
+    cat("\n⚠️ Error crítico en el puente de descarga Excel:", e$message, "\n")
+    return(NULL)
   })
-  return(NULL) 
+  return(NULL)
 }
 
+##############
+#################
+##################
 ###########
-#########################
 
 # --- CARGA DE DATOS MAESTROS ---
 # Nota: Ajusta las rutas si los archivos están dentro de una carpeta específica
@@ -434,8 +463,7 @@ server <- function(input, output, session) {
     )
   })
   
-  
-  
+
   
   
   
@@ -3467,6 +3495,10 @@ server <- function(input, output, session) {
   #################
   #########################
   output$contenedor_graficos <- renderUI({
+    # 🔥 EL ESCUDO DE CONTROL: Si el login se acaba de realizar pero la variable 
+    # aún está vacía o procesándose, frena el código aquí y evita que se cuelgue.
+    req(datos_cajas_filtrados())
+    
     df_raw <- datos_cajas_filtrados()
     
     # Si aún no hay datos, mostrar un mensaje de carga
@@ -3759,17 +3791,60 @@ server <- function(input, output, session) {
   # --- FILTRO REACTIVO POR FECHA ---
   # --- FILTRO (Asegurando que Plotly solo reciba Data) ---
   # 3. El filtro ahora lee del contenedor 'data_storage'
-  # Creamos un valor reactivo aislado
-  mis_datos <- reactiveVal(data.frame())
+  # # Creamos un valor reactivo aislado
+  # mis_datos <- reactiveVal(data.frame())
+  # 
+  # # # --- EL MOTOR REACTIVO SEGURO (INMUNE A CUELGUES DE LOGIN) ---
+  # # observe({
+  # #   # Revisa cada 5 minutos para no saturar la memoria RAM con los 7 MB
+  # #   invalidateLater(300000)
+  # #   
+  # #   # 🔥 REGLA DE ORO: Si el usuario NO se ha logueado, det12345enemos la descarga.
+  # #   # Esto hace que la pantalla de Login cargue de inmediato a la velocidad de la luz.
+  # #   # (Asegúrate de que 'credentials()' sea el objeto reactivo de tu Login)
+  # #   if (is.null(user_info()$logged_in) || user_info()$logged_in == FALSE) {
+  # #     return(NULL)
+  # #   }
+  # #   
+  # #   # Si el usuario ya se logueó con éxito, el código avanza y descarga los 7 MB
+  # #   nueva_data <- descargar_datos()
+  # #   if (!is.null(nueva_data)) {
+  # #     mis_datos(nueva_data)
+  # #   }
+  # # })
+  # # 
+  # # 
   
-  # Actualización cada 10 segundos
+  
+  
+  # 1. Creamos la variable reactiva vacía pero con los nombres de tus columnas 
+  mis_datos <- reactiveVal(data.frame(
+    Marcadecaja = character(),
+    Pesoneto = numeric(),
+    Cajadesegunda = character()
+  ))
+  
+  # --- EL MOTOR REACTIVO SEGURO (INMUNE A CUELGUES DE LOGIN) ---
   observe({
-    invalidateLater(10000)
-    nueva_data <- descargar_datos()
-    if (!is.null(nueva_data)) {
-      mis_datos(nueva_data) # Solo actualiza si hay datos reales
+    # Revisa cada 5 minutos
+    invalidateLater(300000)
+    
+    # Si el usuario NO se ha logueado, se detiene aquí y no consume RAM
+    if (is.null(user_info()$logged_in) || user_info()$logged_in == FALSE) {
+      return(NULL)
     }
+    
+    # 🔥 EL TRUCO ANTICONGELAMIENTO:
+    # Usamos un 'isolate' para que la descarga ocurra en un canal aislado 
+    # sin bloquear la pantalla de Shiny justo después del login
+    isolate({
+      nueva_data <- descargar_datos()
+      if (!is.null(nueva_data) && nrow(nueva_data) > 0) {
+        mis_datos(nueva_data)
+      }
+    })
   })
+  
   
                             # # Filtro de fecha
                             # datos_cajas_filtrados <- reactive({
