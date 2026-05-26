@@ -67,7 +67,7 @@
         "Maintainer": "Martin Maechler <mmaechler+Matrix@gmail.com>",
         "Repository": "CRAN",
         "Date/Publication": "2025-08-28 11:50:02 UTC",
-        "Built": "R 4.5.2; x86_64-pc-linux-gnu; 2025-10-31 10:20:35 UTC; unix"
+        "Built": "R 4.5.3; x86_64-pc-linux-gnu; 2026-03-11 09:34:30 UTC; unix"
       }
     },
     "R6": {
@@ -927,6 +927,36 @@
         "Built": "R 4.5.0; x86_64-pc-linux-gnu; 2025-04-14 16:31:43 UTC; unix"
       }
     },
+    "gargle": {
+      "Source": "CRAN",
+      "Repository": "http://rspm/default/latest",
+      "description": {
+        "Package": "gargle",
+        "Title": "Utilities for Working with Google APIs",
+        "Version": "1.6.1",
+        "Authors@R": "c(\n    person(\"Jennifer\", \"Bryan\", , \"jenny@posit.co\", role = c(\"aut\", \"cre\"),\n           comment = c(ORCID = \"0000-0002-6983-2759\")),\n    person(\"Craig\", \"Citro\", , \"craigcitro@google.com\", role = \"aut\"),\n    person(\"Hadley\", \"Wickham\", , \"hadley@posit.co\", role = \"aut\",\n           comment = c(ORCID = \"0000-0003-4757-117X\")),\n    person(\"Google Inc\", role = \"cph\"),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"))\n  )",
+        "Description": "Provides utilities for working with Google APIs\n    <https://developers.google.com/apis-explorer>.  This includes\n    functions and classes for handling common credential types and for\n    preparing, executing, and processing HTTP requests.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://gargle.r-lib.org, https://github.com/r-lib/gargle",
+        "BugReports": "https://github.com/r-lib/gargle/issues",
+        "Depends": "R (>= 4.1)",
+        "Imports": "cli (>= 3.0.1), fs (>= 1.3.1), glue (>= 1.3.0), httr (>=\n1.4.5), jsonlite, lifecycle (>= 0.2.0), openssl, rappdirs,\nrlang (>= 1.1.0), stats, utils, withr",
+        "Suggests": "aws.ec2metadata, aws.signature, covr, httpuv, knitr,\nrmarkdown, sodium, spelling, testthat (>= 3.1.7)",
+        "VignetteBuilder": "knitr",
+        "Config/Needs/website": "tidyverse/tidytemplate",
+        "Config/testthat/edition": "3",
+        "Encoding": "UTF-8",
+        "Language": "en-US",
+        "RoxygenNote": "7.3.3",
+        "NeedsCompilation": "no",
+        "Packaged": "2026-01-28 21:12:16 UTC; jenny",
+        "Author": "Jennifer Bryan [aut, cre] (ORCID:\n    <https://orcid.org/0000-0002-6983-2759>),\n  Craig Citro [aut],\n  Hadley Wickham [aut] (ORCID: <https://orcid.org/0000-0003-4757-117X>),\n  Google Inc [cph],\n  Posit Software, PBC [cph, fnd]",
+        "Maintainer": "Jennifer Bryan <jenny@posit.co>",
+        "Repository": "RSPM",
+        "Date/Publication": "2026-01-29 06:10:33 UTC",
+        "Built": "R 4.5.0; ; 2026-01-30 06:05:01 UTC; unix"
+      }
+    },
     "generics": {
       "Source": "CRAN",
       "Repository": "http://rspm/default/latest",
@@ -1016,6 +1046,66 @@
         "Repository": "RSPM",
         "Date/Publication": "2024-09-30 22:30:01 UTC",
         "Built": "R 4.5.0; x86_64-pc-linux-gnu; 2025-04-05 19:59:41 UTC; unix"
+      }
+    },
+    "googledrive": {
+      "Source": "CRAN",
+      "Repository": "http://rspm/default/latest",
+      "description": {
+        "Package": "googledrive",
+        "Title": "An Interface to Google Drive",
+        "Version": "2.1.2",
+        "Authors@R": "c(\n    person(\"Lucy\", \"D'Agostino McGowan\", , role = \"aut\"),\n    person(\"Jennifer\", \"Bryan\", , \"jenny@posit.co\", role = c(\"aut\", \"cre\"),\n           comment = c(ORCID = \"0000-0002-6983-2759\")),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"))\n  )",
+        "Description": "Manage Google Drive files from R.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://googledrive.tidyverse.org,\nhttps://github.com/tidyverse/googledrive",
+        "BugReports": "https://github.com/tidyverse/googledrive/issues",
+        "Depends": "R (>= 4.1)",
+        "Imports": "cli (>= 3.0.0), gargle (>= 1.6.0), glue (>= 1.4.2), httr,\njsonlite, lifecycle, magrittr, pillar (>= 1.9.0), purrr (>=\n1.0.1), rlang (>= 1.0.2), tibble (>= 2.0.0), utils, uuid, vctrs\n(>= 0.3.0), withr",
+        "Suggests": "curl, dplyr (>= 1.0.0), knitr, rmarkdown, spelling, testthat\n(>= 3.1.5)",
+        "VignetteBuilder": "knitr",
+        "Config/Needs/website": "tidyverse, tidyverse/tidytemplate",
+        "Config/testthat/edition": "3",
+        "Encoding": "UTF-8",
+        "Language": "en-US",
+        "RoxygenNote": "7.3.3",
+        "NeedsCompilation": "no",
+        "Packaged": "2025-09-10 06:10:03 UTC; jenny",
+        "Author": "Lucy D'Agostino McGowan [aut],\n  Jennifer Bryan [aut, cre] (ORCID:\n    <https://orcid.org/0000-0002-6983-2759>),\n  Posit Software, PBC [cph, fnd]",
+        "Maintainer": "Jennifer Bryan <jenny@posit.co>",
+        "Repository": "RSPM",
+        "Date/Publication": "2025-09-10 08:50:06 UTC",
+        "Built": "R 4.5.0; ; 2025-12-02 12:28:36 UTC; unix"
+      }
+    },
+    "googlesheets4": {
+      "Source": "CRAN",
+      "Repository": "http://rspm/default/latest",
+      "description": {
+        "Package": "googlesheets4",
+        "Title": "Access Google Sheets using the Sheets API V4",
+        "Version": "1.1.2",
+        "Authors@R": "c(\n    person(\"Jennifer\", \"Bryan\", , \"jenny@posit.co\", role = c(\"cre\", \"aut\"),\n           comment = c(ORCID = \"0000-0002-6983-2759\")),\n    person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"))\n  )",
+        "Description": "Interact with Google Sheets through the Sheets API v4\n    <https://developers.google.com/sheets/api>. \"API\" is an acronym for\n    \"application programming interface\"; the Sheets API allows users to\n    interact with Google Sheets programmatically, instead of via a web\n    browser. The \"v4\" refers to the fact that the Sheets API is currently\n    at version 4. This package can read and write both the metadata and\n    the cell data in a Sheet.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://googlesheets4.tidyverse.org,\nhttps://github.com/tidyverse/googlesheets4",
+        "BugReports": "https://github.com/tidyverse/googlesheets4/issues",
+        "Depends": "R (>= 3.6)",
+        "Imports": "cellranger, cli (>= 3.0.0), curl, gargle (>= 1.6.0), glue (>=\n1.3.0), googledrive (>= 2.1.0), httr, ids, lifecycle, magrittr,\nmethods, purrr, rematch2, rlang (>= 1.0.2), tibble (>= 2.1.1),\nutils, vctrs (>= 0.2.3), withr",
+        "Suggests": "readr, rmarkdown, spelling, testthat (>= 3.1.7)",
+        "ByteCompile": "true",
+        "Config/Needs/website": "tidyverse, tidyverse/tidytemplate",
+        "Config/testthat/edition": "3",
+        "Encoding": "UTF-8",
+        "Language": "en-US",
+        "RoxygenNote": "7.3.2.9000",
+        "NeedsCompilation": "no",
+        "Packaged": "2025-09-03 23:00:43 UTC; jenny",
+        "Author": "Jennifer Bryan [cre, aut] (ORCID:\n    <https://orcid.org/0000-0002-6983-2759>),\n  Posit Software, PBC [cph, fnd]",
+        "Maintainer": "Jennifer Bryan <jenny@posit.co>",
+        "Repository": "RSPM",
+        "Date/Publication": "2025-09-03 23:20:02 UTC",
+        "Built": "R 4.5.0; ; 2025-09-04 04:28:25 UTC; unix"
       }
     },
     "gtable": {
@@ -1250,6 +1340,32 @@
         "Built": "R 4.5.0; ; 2026-02-15 04:26:42 UTC; unix"
       }
     },
+    "ids": {
+      "Source": "CRAN",
+      "Repository": "http://rspm/default/latest",
+      "description": {
+        "Package": "ids",
+        "Title": "Generate Random Identifiers",
+        "Version": "1.0.1",
+        "Authors@R": "person(\"Rich\", \"FitzJohn\", role = c(\"aut\", \"cre\"),\n    email = \"rich.fitzjohn@gmail.com\")",
+        "Description": "Generate random or human readable and pronounceable identifiers.",
+        "License": "MIT + file LICENSE",
+        "URL": "https://github.com/richfitz/ids",
+        "BugReports": "https://github.com/richfitz/ids/issues",
+        "Imports": "openssl, uuid",
+        "Suggests": "knitr, rcorpora, rmarkdown, testthat",
+        "RoxygenNote": "6.0.1",
+        "VignetteBuilder": "knitr",
+        "NeedsCompilation": "no",
+        "Packaged": "2017-05-31 08:43:42 UTC; rich",
+        "Author": "Rich FitzJohn [aut, cre]",
+        "Maintainer": "Rich FitzJohn <rich.fitzjohn@gmail.com>",
+        "Repository": "RSPM",
+        "Date/Publication": "2017-05-31 08:49:59 UTC",
+        "Encoding": "UTF-8",
+        "Built": "R 4.5.0; ; 2025-04-05 20:09:39 UTC; unix"
+      }
+    },
     "igraph": {
       "Source": "CRAN",
       "Repository": "http://rspm/default/latest",
@@ -1458,8 +1574,8 @@
       "Repository": "http://rspm/default/latest",
       "description": {
         "Package": "lattice",
-        "Version": "0.22-7",
-        "Date": "2025-03-31",
+        "Version": "0.22-9",
+        "Date": "2026-02-03",
         "Priority": "recommended",
         "Title": "Trellis Graphics for R",
         "Authors@R": "c(person(\"Deepayan\", \"Sarkar\", role = c(\"aut\", \"cre\"),\n\t            email = \"deepayan.sarkar@r-project.org\",\n\t\t    comment = c(ORCID = \"0000-0003-4107-1553\")),\n              person(\"Felix\", \"Andrews\", role = \"ctb\"),\n\t      person(\"Kevin\", \"Wright\", role = \"ctb\", comment = \"documentation\"),\n\t      person(\"Neil\", \"Klepeis\", role = \"ctb\"),\n\t      person(\"Johan\", \"Larsson\", role = \"ctb\", comment = \"miscellaneous improvements\"),\n              person(\"Zhijian (Jason)\", \"Wen\", role = \"cph\", comment = \"filled contour code\"),\n              person(\"Paul\", \"Murrell\", role = \"ctb\", email = \"paul@stat.auckland.ac.nz\"),\n\t      person(\"Stefan\", \"Eng\", role = \"ctb\", comment = \"violin plot improvements\"),\n\t      person(\"Achim\", \"Zeileis\", role = \"ctb\", comment = \"modern colors\"),\n              person(\"Alexandre\", \"Courtiol\", role = \"ctb\", comment = \"generics for larrows, lpolygon, lrect and lsegments\")\n\t      )",
@@ -1474,12 +1590,12 @@
         "URL": "https://lattice.r-forge.r-project.org/",
         "BugReports": "https://github.com/deepayan/lattice/issues",
         "NeedsCompilation": "yes",
-        "Packaged": "2025-04-02 04:55:57 UTC; deepayan",
-        "Author": "Deepayan Sarkar [aut, cre] (<https://orcid.org/0000-0003-4107-1553>),\n  Felix Andrews [ctb],\n  Kevin Wright [ctb] (documentation),\n  Neil Klepeis [ctb],\n  Johan Larsson [ctb] (miscellaneous improvements),\n  Zhijian (Jason) Wen [cph] (filled contour code),\n  Paul Murrell [ctb],\n  Stefan Eng [ctb] (violin plot improvements),\n  Achim Zeileis [ctb] (modern colors),\n  Alexandre Courtiol [ctb] (generics for larrows, lpolygon, lrect and\n    lsegments)",
+        "Packaged": "2026-02-08 19:21:28 UTC; deepayan",
+        "Author": "Deepayan Sarkar [aut, cre] (ORCID:\n    <https://orcid.org/0000-0003-4107-1553>),\n  Felix Andrews [ctb],\n  Kevin Wright [ctb] (documentation),\n  Neil Klepeis [ctb],\n  Johan Larsson [ctb] (miscellaneous improvements),\n  Zhijian (Jason) Wen [cph] (filled contour code),\n  Paul Murrell [ctb],\n  Stefan Eng [ctb] (violin plot improvements),\n  Achim Zeileis [ctb] (modern colors),\n  Alexandre Courtiol [ctb] (generics for larrows, lpolygon, lrect and\n    lsegments)",
         "Maintainer": "Deepayan Sarkar <deepayan.sarkar@r-project.org>",
         "Repository": "CRAN",
-        "Date/Publication": "2025-04-02 15:40:02 UTC",
-        "Built": "R 4.5.2; x86_64-pc-linux-gnu; 2025-10-31 10:20:27 UTC; unix"
+        "Date/Publication": "2026-02-09 06:10:13 UTC",
+        "Built": "R 4.5.3; x86_64-pc-linux-gnu; 2026-03-11 09:34:23 UTC; unix"
       }
     },
     "lazyeval": {
@@ -2047,6 +2163,32 @@
         "Repository": "RSPM",
         "Date/Publication": "2023-08-30 16:50:02 UTC",
         "Built": "R 4.5.0; ; 2025-04-05 20:03:54 UTC; unix"
+      }
+    },
+    "rematch2": {
+      "Source": "CRAN",
+      "Repository": "http://rspm/default/latest",
+      "description": {
+        "Package": "rematch2",
+        "Title": "Tidy Output from Regular Expression Matching",
+        "Version": "2.1.2",
+        "Authors@R": "c(\n    person(\"Gábor\", \"Csárdi\", email = \"csardi.gabor@gmail.com\", role = c(\"aut\", \"cre\")),\n    person(\"Matthew\", \"Lincoln\", email = \"matthew.d.lincoln@gmail.com\", role = c(\"ctb\")))",
+        "Description": "Wrappers on 'regexpr' and 'gregexpr' to return the match\n    results in tidy data frames.",
+        "License": "MIT + file LICENSE",
+        "LazyData": "true",
+        "URL": "https://github.com/r-lib/rematch2#readme",
+        "BugReports": "https://github.com/r-lib/rematch2/issues",
+        "RoxygenNote": "7.1.0",
+        "Imports": "tibble",
+        "Suggests": "covr, testthat",
+        "Encoding": "UTF-8",
+        "NeedsCompilation": "no",
+        "Packaged": "2020-04-30 10:31:13 UTC; gaborcsardi",
+        "Author": "Gábor Csárdi [aut, cre],\n  Matthew Lincoln [ctb]",
+        "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
+        "Repository": "RSPM",
+        "Date/Publication": "2020-05-01 06:50:02 UTC",
+        "Built": "R 4.5.0; ; 2025-04-05 22:52:59 UTC; unix"
       }
     },
     "rjson": {
@@ -2620,6 +2762,29 @@
         "Built": "R 4.5.0; x86_64-pc-linux-gnu; 2025-06-09 04:13:01 UTC; unix"
       }
     },
+    "uuid": {
+      "Source": "CRAN",
+      "Repository": "http://rspm/default/latest",
+      "description": {
+        "Package": "uuid",
+        "Version": "1.2-2",
+        "Title": "Tools for Generating and Handling of UUIDs",
+        "Author": "Simon Urbanek [aut, cre, cph] (https://urbanek.org, ORCID:\n    <https://orcid.org/0000-0003-2297-1732>),\n  Theodore Ts'o [aut, cph] (libuuid)",
+        "Maintainer": "Simon Urbanek <Simon.Urbanek@r-project.org>",
+        "Authors@R": "c(person(\"Simon\", \"Urbanek\", role=c(\"aut\",\"cre\",\"cph\"), email=\"Simon.Urbanek@r-project.org\", comment=c(\"https://urbanek.org\", ORCID=\"0000-0003-2297-1732\")), person(\"Theodore\",\"Ts'o\", email=\"tytso@thunk.org\", role=c(\"aut\",\"cph\"), comment=\"libuuid\"))",
+        "Depends": "R (>= 2.9.0)",
+        "Description": "Tools for generating and handling of UUIDs (Universally Unique Identifiers).",
+        "License": "MIT + file LICENSE",
+        "URL": "https://www.rforge.net/uuid",
+        "BugReports": "https://github.com/s-u/uuid/issues",
+        "NeedsCompilation": "yes",
+        "Packaged": "2026-01-23 00:09:28 UTC; rforge",
+        "Repository": "RSPM",
+        "Date/Publication": "2026-01-23 06:40:09 UTC",
+        "Encoding": "UTF-8",
+        "Built": "R 4.5.0; x86_64-pc-linux-gnu; 2026-01-24 04:25:39 UTC; unix"
+      }
+    },
     "vctrs": {
       "Source": "CRAN",
       "Repository": "http://rspm/default/latest",
@@ -2879,6 +3044,9 @@
     "bdspb-f17f3-b12b31fae4b0.json": {
       "checksum": "844ebcad2296a7f5530d0e82efef1b95"
     },
+    "dashboard-cajas-496915-7be6a08df01d.json": {
+      "checksum": "14b2d92e5cfa05a3b142892fa76923f4"
+    },
     "LABORES AGRICOLAS/Cajas registradas en SAN HUMBERTO wk 18 -hlf.xlsx": {
       "checksum": "71944b739e0f479e52f501968c981fab"
     },
@@ -2913,13 +3081,13 @@
       "checksum": "75fc32d5033301c1677c5577cb65a2da"
     },
     "server.R": {
-      "checksum": "c14505b36a04f69c4ccc01e239981ff9"
+      "checksum": "9b94476e54c9521c7c1c245b2bc5f960"
     },
     "ui.R": {
       "checksum": "262a5243d95df51e28f3c06f7619f698"
     },
     "usuarios2.csv": {
-      "checksum": "5740f9f0f607e0e90b29a0435a76338b"
+      "checksum": "8286c26c38277e52483dfe8a2c488db4"
     },
     "www/LOGOSBL.png": {
       "checksum": "31cb760c9aceb1255ed61badb15b11ba"
