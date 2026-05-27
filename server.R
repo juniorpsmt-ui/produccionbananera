@@ -24,11 +24,22 @@ library(gargle)
 options(
   gargle_oauth_cache = FALSE,
   googledrive_quiet = TRUE,
-  googlesheets4_quiet = TRUE
+  googlesheets4_quiet = TRUE,
+  gargle_interact = FALSE # 🔥 ¡ESTA LÍNEA ES EL SECRETO! Apaga las preguntas de R
 )
-
 # Nombre exacto del archivo JSON que debe estar en tu carpeta
 nombre_json <- "dashboard-cajas-496915-7be6a08df01d.json"
+
+# # 🔥 AUTENTICACIÓN GLOBAL RE-ESTRUCTURADA (Anti HTTP 400)
+# if (file.exists(nombre_json)) {
+# 
+#   # Autenticamos cada librería de forma independiente con su propia estructura nativa
+#   googledrive::drive_auth(path = nombre_json)
+#   googlesheets4::gs4_auth(path = nombre_json)
+# 
+# } else {
+#   cat("\n⚠️ ERROR OPERATIVO: No se encuentra el archivo JSON de credenciales.\n")
+# }
 
 # =====================================================================
 # 🌐 EL PUENTE EN EL AIRE: FUNCIÓN OPTIMIZADA SIN ARCHIVOS LOCALES
@@ -76,50 +87,80 @@ nombre_json <- "dashboard-cajas-496915-7be6a08df01d.json"
 ##################
 ##############
 
+# 
+# descargar_datos <- function() {
+#   file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
+#   
+#   tryCatch({
+#     if (!file.exists(nombre_json)) {
+#       cat("\n⚠️ ERROR: No se encuentra el archivo JSON de credenciales.\n")
+#       return(NULL)
+#     }
+#     
+#     # 1. Autenticación con el robot en Google Drive
+#     googledrive::drive_auth(path = nombre_json)
+#     
+#     # 2. MODO PUENTE SEGURO: Creamos un archivo temporal invisible en la RAM profunda de R
+#     # (tempfile() no toca tus carpetas locales, no ensucia tu Git y se destruye solo al cerrar)
+#     tf <- tempfile(fileext = ".xlsx")
+#     
+#     # 3. Descarga silenciosa del Excel real de 7 MB
+#     googledrive::drive_download(
+#       as_id(file_id),
+#       path = tf,
+#       overwrite = TRUE,
+#       verbose = FALSE
+#     )
+#     
+#     # 4. Lectura veloz de la pestaña "Datos" 
+#     # Usamos guess_max para que no pierda tiempo analizando filas y no consuma CPU
+#     df <- readxl::read_excel(tf, sheet = "Datos", guess_max = 5000)
+#     df <- as.data.frame(df)
+#     
+#     # 5. Forzar la liberación inmediata de la memoria RAM de Posit Cloud
+#     gc()
+#     
+#     return(df)
+#     
+#   }, error = function(e) {
+#     cat("\n⚠️ Error crítico en el puente de descarga Excel:", e$message, "\n")
+#     return(NULL)
+#   })
+#   return(NULL)
+# }
+# 
+# ##############
+#################
 
 descargar_datos <- function() {
   file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
+  tf <- tempfile(fileext = ".xlsx")
   
   tryCatch({
-    if (!file.exists(nombre_json)) {
-      cat("\n⚠️ ERROR: No se encuentra el archivo JSON de credenciales.\n")
+    # Al ser un archivo con acceso público por enlace, la API de exportación de Google
+    # te entrega el archivo .xlsx limpio de forma directa mediante HTTP estándar.
+    url_publica <- paste0("https://docs.google.com/spreadsheets/d/", file_id, "/export?format=xlsx")
+    
+    # Descarga binaria nativa del sistema operativo, ultra-veloz e infalible
+    utils::download.file(url_publica, destfile = tf, mode = "wb", quiet = TRUE)
+    
+    # 3. Leer el archivo Excel resultante si la descarga fue exitosa
+    if (file.exists(tf) && file.info(tf)$size > 1000) {
+      df <- readxl::read_excel(tf, sheet = "Datos", guess_max = 5000)
+      df <- as.data.frame(df)
+      
+      gc() # Forzar la liberación inmediata de memoria RAM de Posit
+      return(df)
+    } else {
+      cat("\n⚠️ Error: El archivo no se pudo descargar. Verifica que esté compartido por enlace.\n")
       return(NULL)
     }
     
-    # 1. Autenticación con el robot en Google Drive
-    googledrive::drive_auth(path = nombre_json)
-    
-    # 2. MODO PUENTE SEGURO: Creamos un archivo temporal invisible en la RAM profunda de R
-    # (tempfile() no toca tus carpetas locales, no ensucia tu Git y se destruye solo al cerrar)
-    tf <- tempfile(fileext = ".xlsx")
-    
-    # 3. Descarga silenciosa del Excel real de 7 MB
-    googledrive::drive_download(
-      as_id(file_id),
-      path = tf,
-      overwrite = TRUE,
-      verbose = FALSE
-    )
-    
-    # 4. Lectura veloz de la pestaña "Datos" 
-    # Usamos guess_max para que no pierda tiempo analizando filas y no consuma CPU
-    df <- readxl::read_excel(tf, sheet = "Datos", guess_max = 5000)
-    df <- as.data.frame(df)
-    
-    # 5. Forzar la liberación inmediata de la memoria RAM de Posit Cloud
-    gc()
-    
-    return(df)
-    
   }, error = function(e) {
-    cat("\n⚠️ Error crítico en el puente de descarga Excel:", e$message, "\n")
+    cat("\n⚠️ Error crítico en la descarga directa:", e$message, "\n")
     return(NULL)
   })
-  return(NULL)
 }
-
-##############
-#################
 ##################
 ###########
 
