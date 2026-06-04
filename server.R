@@ -1272,10 +1272,35 @@ server <- function(input, output, session) {
           
           tabItem(tabName = "cajas_online",
                   
-                  # Estilo para ocultar el botón al momento de imprimir
+                  # Estilos específicos para la impresión del Reporte
                   tags$head(
-                    tags$style(HTML("@media print { .no-print { display: none !important; } }"))
+                    tags$style(HTML("
+    /* Ocultar elementos innecesarios en el papel o PDF */
+    @media print { 
+      .no-print { display: none !important; } 
+      
+      /* Forzar que el membrete de autoría aparezca arriba a la derecha en el papel */
+      .pie-impresion-autor {
+        display: block !important;
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-family: 'Poppins', Arial, sans-serif;
+        font-size: 13px;
+        font-weight: bold;
+        color: #444444;
+      }
+    }
+    
+    /* En la pantalla normal de la App web permanece completamente invisible */
+    @media screen {
+      .pie-impresion-autor { display: none; }
+    }
+  "))
                   ),
+                  
+                  # Elemento oculto en web pero activo al imprimir/guardar PDF
+                  tags$div(class = "pie-impresion-autor", "Creado por Mgtr. Pedro Muñoz"),
                   
                   
                   fluidRow(
