@@ -131,6 +131,145 @@ nombre_json <- "dashboard-cajas-496915-7be6a08df01d.json"
 # 
 # ##############
 #################
+#################
+################
+
+# =====================================================================
+# 🌐 CONEXIÓN DIRECTA Y SEGURA PARA EL MÓDULO DE MERMA
+# =====================================================================
+# =====================================================================
+# 🌐 CONEXIÓN DIRECTA Y LIMPIEZA INMEDIATA DE MERMA
+# =====================================================================
+# =====================================================================
+# 🌐 CONEXIÓN DIRECTA, DESINFECTADO Y HOMOLOGACIÓN DE TIPOS (DRIVE)
+# =====================================================================
+# =====================================================================
+# 🌐 CONEXIÓN DIRECTA Y LIMPIEZA QUIRÚRGICA DE VARIABLES (DRIVE)
+# =====================================================================
+# =====================================================================
+# 🌐 CONEXIÓN DIRECTA Y DEPURACIÓN DEFINITIVA DE MERMA (DRIVE)
+# =====================================================================
+# =====================================================================
+# 🌐 CONEXIÓN DIRECTA CORREGIDA CON VERIFICACIÓN DE ACCESO
+# =====================================================================
+# =====================================================================
+# 🌐 CONEXIÓN DIRECTA Y LIMPIEZA DE COLUMNAS (GOOGLE SHEETS)
+# =====================================================================
+# =====================================================================
+# 🔍 FUNCIÓN CON AUDITORÍA DE CONSOLA OBLIGATORIA (SUMMARY)
+# =====================================================================
+
+                        # 
+                        # descargar_datos_merma <- function() {
+                        #   file_id_merma <- "1ejv1Bv-gg7KbovmDHqgv-R5a2psyZt7AimEmPVqQ1dU" 
+                        #   
+                        #   tryCatch({
+                        #     # 🔗 Forzamos la descarga en formato CSV limpio (Evita el error de zip/xlsx)
+                        #     url_csv <- paste0("https://docs.google.com/spreadsheets/d/", file_id_merma, "/export?format=csv")
+                        #     
+                        #     # Descarga directa segura a un archivo temporal
+                        #     tmp_file <- tempfile(fileext = ".csv")
+                        #     download.file(url_csv, destfile = tmp_file, mode = "wb", quiet = TRUE)
+                        #     
+                        #     # Lectura del CSV descargado
+                        #     df_merma <- read.csv(tmp_file, stringsAsFactors = FALSE, check.names = FALSE, fileEncoding = "UTF-8")
+                        #     
+                        #     # Borrar archivo temporal después de leerlo
+                        #     if (file.exists(tmp_file)) unlink(tmp_file)
+                        #     
+                        #     if (!is.null(df_merma) && nrow(df_merma) > 0) {
+                        #       
+                        #       # 📅 Extraer la fecha usando el nombre de columna real y exacto
+                        #       col_fecha <- "Fecha de Envío en el Dispositivo (Zona Horaria del Dispositivo)"
+                        #       if (col_fecha %in% colnames(df_merma)) {
+                        #         df_merma$Fecha_Limpia <- as.Date(substr(as.character(df_merma[[col_fecha]]), 1, 10))
+                        #       } else {
+                        #         # Si por alguna razón cambia el nombre, busca por aproximación
+                        #         df_merma$Fecha_Limpia <- as.Date(substr(as.character(df_merma[, 8]), 1, 10))
+                        #       }
+                        #       
+                        #       # Limpieza de textos de control
+                        #       df_merma$`finca-nombre-dt`  <- as.character(df_merma$`finca-nombre-dt`)
+                        #       df_merma$`lote-nombre-dt`   <- as.character(df_merma$`lote-nombre-dt`)
+                        #       df_merma$`Causa-nombre-dt`  <- as.character(df_merma$`Causa-nombre-dt`)
+                        #       
+                        #       # Conversión Numérica Limpia
+                        #       df_merma$MermaBruta      <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$MermaBruta))))
+                        #       df_merma$MermaNeta       <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$MermaNeta))))
+                        #       df_merma$CantidadDedos   <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$CantidadDedos))))
+                        #       df_merma$PesoCausas      <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$PesoCausas))))
+                        #       
+                        #       df_merma$MermaBruta[is.na(df_merma$MermaBruta)] <- 0
+                        #       df_merma$MermaNeta[is.na(df_merma$MermaNeta)]   <- 0
+                        #       
+                        #       return(df_merma)
+                        #     } else {
+                        #       return(NULL)
+                        #     }
+                        #   }, error = function(e) {
+                        #     message("⚠️ Error en la descarga directa: ", e$message)
+                        #     return(NULL)
+                        #   })
+                        # }
+                        # 
+                        # 
+                        # 
+                        # 
+
+
+descargar_datos_merma <- function() {
+  file_id_merma <- "1ejv1Bv-gg7KbovmDHqgv-R5a2psyZt7AimEmPVqQ1dU" 
+  
+  tryCatch({
+    url_csv <- paste0("https://docs.google.com/spreadsheets/d/", file_id_merma, "/export?format=csv")
+    tmp_file <- tempfile(fileext = ".csv")
+    download.file(url_csv, destfile = tmp_file, mode = "wb", quiet = TRUE)
+    df_merma <- read.csv(tmp_file, stringsAsFactors = FALSE, check.names = FALSE, fileEncoding = "UTF-8")
+    if (file.exists(tmp_file)) unlink(tmp_file)
+    
+    if (!is.null(df_merma) && nrow(df_merma) > 0) {
+      
+      # 📅 Extraer la fecha estándar
+      col_fecha <- "Fecha de Envío en el Dispositivo (Zona Horaria del Dispositivo)"
+      if (col_fecha %in% colnames(df_merma)) {
+        df_merma$Fecha_Limpia <- as.Date(substr(as.character(df_merma[[col_fecha]]), 1, 10))
+      } else {
+        df_merma$Fecha_Limpia <- as.Date(substr(as.character(df_merma[, 8]), 1, 10))
+      }
+      
+      # 🗓️ NUEVO: Calcular la Semana Estadística (Año-Semana, ej: 2026-W27)
+      df_merma$Semana <- format(df_merma$Fecha_Limpia, "%Y-W%V")
+      
+      # Limpieza de textos de control
+      df_merma$`finca-nombre-dt`  <- as.character(df_merma$`finca-nombre-dt`)
+      df_merma$`lote-nombre-dt`   <- as.character(df_merma$`lote-nombre-dt`)
+      df_merma$`Causa-nombre-dt`  <- as.character(df_merma$`Causa-nombre-dt`)
+      
+      # Conversión Numérica
+      df_merma$MermaBruta      <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$MermaBruta))))
+      df_merma$MermaNeta       <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$MermaNeta))))
+      df_merma$CantidadDedos   <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$CantidadDedos))))
+      df_merma$PesoCausas      <- suppressWarnings(as.numeric(gsub(",", ".", trimws(df_merma$PesoCausas))))
+      
+      df_merma$MermaBruta[is.na(df_merma$MermaBruta)] <- 0
+      df_merma$MermaNeta[is.na(df_merma$MermaNeta)]   <- 0
+      df_merma$PesoCausas[is.na(df_merma$PesoCausas)] <- 0
+      df_merma$CantidadDedos[is.na(df_merma$CantidadDedos)] <- 0
+      
+      return(df_merma)
+    } else {
+      return(NULL)
+    }
+  }, error = function(e) {
+    return(NULL)
+  })
+}
+
+
+#####################
+##################ESTO CREO QUE DE CJAS 
+#####################
+######################
 
 descargar_datos <- function() {
   file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
@@ -1094,6 +1233,10 @@ server <- function(input, output, session) {
           menuItem("Cajas Procesadas en Línea", tabName = "cajas_online", icon = icon("box")),
           
           
+          # 🔥 NUEVO MÓDULO ADICIONADO
+          menuItem("📉 Control de Merma en Línea", tabName = "merma_online", icon = icon("chart-pie")),
+          
+          
           menuItem("📊 Reporte Administrativo General por Lotes", tabName = "tab_reporte_admin", icon = icon("chart-bar")),
           # *** NUEVA PESTAÑA 2: REPORTE POR SEMANA ***
           menuItem("📅 Reporte Administrativo por Semana", tabName = "tab_reporte_admin_semana", icon = icon("calendar-alt")),
@@ -1377,6 +1520,141 @@ server <- function(input, output, session) {
                   )
                   
           ),
+          
+          #################
+          ####################
+          ###############
+                            # ##########
+                            # # 🔥 MÓDULO DE MERMA EN LÍNEA TOTALMENTE INTERACTIVO
+                            # tabItem(tabName = "merma_online",
+                            #         h2("📉 Módulo de Control y Análisis de Merma Operativa"),
+                            #         br(),
+                            #         
+                            #         # FILTROS DE CAPTURA DE MERMA
+                            #         fluidRow(
+                            #           box(title = "Filtros de Análisis de Merma", status = "primary", solidHeader = TRUE, width = 12,
+                            #               column(width = 3, dateInput("filtro_fecha_merma", "📅 Seleccionar Fecha de Proceso:", 
+                            #                                           value = as.Date("2026-07-02"), language = "es", format = "dd/mm/yyyy")),
+                            #               column(width = 3, selectInput("filtro_finca_merma", "🚜 Seleccionar Finca:", choices = "Todas")),
+                            #               column(width = 3, selectInput("filtro_lote_merma", "📍 Seleccionar Lote:", choices = "Todos"))
+                            #           )
+                            #         ),
+                            #         br(),
+                            #         
+                            #         # REJILLA DE GRÁFICOS INTERACTIVOS (HIGHCHARTS)
+                            #         fluidRow(
+                            #           box(title = "Distribución del Impacto de Pérdidas", status = "success", solidHeader = TRUE, width = 12,
+                            #               uiOutput("contenedor_graficos_merma")
+                            #           )
+                            #         )
+                            # ),
+                            # 
+                            # 
+          
+          ##############
+          
+          
+          ##########
+          # 🔥 MÓDULO DE MERMA EN LÍNEA TOTALMENTE INTERACTIVO
+          tabItem(tabName = "merma_online",
+                  
+                  # 🎨 Inyección CSS nativa: Fuerza a la impresora a ocultar botones y pintar la cabecera
+                  tags$head(
+                    tags$style(HTML("
+                      @media print {
+                        .btn, .main-sidebar, .main-header, .box-header .btn { display: none !important; }
+                        .content-wrapper { margin-left: 0 !important; padding: 0 !important; }
+                        .box.box-success { border-top: none !important; }
+                      }
+                    "))
+                  ),
+                  
+                  # Encabezado con el Botón de Impresión (Se oculta solo al imprimir)
+                  fluidRow(
+                    column(width = 10, h2("📉 Módulo de Control y Análisis de Merma Operativa")),
+                    column(width = 2, align = "right", style = "margin-top: 20px;",
+                           div(class = "hidden-print", # Oculta el botón en el papel
+                               actionButton("btn_imprimir_merma", "Imprimir Reporte", 
+                                            icon = icon("print"), class = "btn-primary")
+                           ))
+                  ),
+                  br(),
+                  
+                  # FILTROS DE CAPTURA DE MERMA (Se ocultan automáticamente en la impresión)
+                  div(class = "hidden-print",
+                      fluidRow(
+                        box(title = "Filtros de Análisis de Merma", status = "primary", solidHeader = TRUE, width = 12,
+                            column(width = 3, dateInput("filtro_fecha_merma", "📅 Seleccionar Fecha de Proceso:", 
+                                                        value = as.Date("2026-07-02"), language = "es", format = "dd/mm/yyyy")),
+                            column(width = 3, selectInput("filtro_semana_merma", "🗓️ Seleccionar Semana:", choices = "Todas")),
+                            column(width = 3, selectInput("filtro_finca_merma", "🚜 Seleccionar Finca:", choices = "Todas")),
+                            column(width = 3, selectInput("filtro_lote_merma", "📍 Seleccionar Lote:", choices = "Todos"))
+                        )
+                      )
+                  ),
+                  br(),
+                  
+                                                                        #         # REJILLA DE GRÁFICOS INTERACTIVOS (HIGHCHARTS)
+                                                                        #         fluidRow(
+                                                                        #           box(
+                                                                        #             title = tagList(
+                                                                        #               span("Distribución del Impacto de Pérdidas", style = "font-weight: bold;"),
+                                                                        #               # 👤 ESTA FIRMA SOLO ENTRA EN ACCIÓN EN EL PAPEL / PDF:
+                                                                        #               div(class = "visible-print-block", 
+                                                                        #                   style = "text-align: left; font-weight: bold; font-size: 14px; color: #333; margin-bottom: 15px; font-style: italic;",
+                                                                        #                   "Creado por: Mgtr. Pedro Muñoz"
+                                                                        #               )
+                                                                        #             ), 
+                                                                        #             status = "success", 
+                                                                        #             solidHeader = TRUE, 
+                                                                        #             width = 12,
+                                                                        #             uiOutput("contenedor_graficos_merma")
+                                                                        #           )
+                                                                        #         )
+                                                                        # ),
+                                                                        # 
+                  
+                  
+                  # =================================================================
+                  # 🖨️ FILA DE AUTORÍA EXCLUSIVA PARA IMPRESIÓN (ALINEADO A LA IZQUIERDA)
+                  # =================================================================
+                  fluidRow(
+                    column(width = 12,
+                           # Esta etiqueta solo nace en el papel y se alinea a la izquierda
+                           div(class = "visible-print-block", 
+                               style = "text-align: right; font-weight: bold; font-size: 14px; color: #333; margin-bottom: 15px; font-style: italic;",
+                               "Creado por: Mgtr. Pedro Muñoz"
+                           )
+                    )
+                  ),
+                  
+                  # REJILLA DE GRÁFICOS INTERACTIVOS (HIGHCHARTS)
+                  fluidRow(
+                    box(
+                      title = span("Distribución del Impacto de Pérdidas", style = "font-weight: bold;"),
+                      status = "success", 
+                      solidHeader = TRUE, 
+                      width = 12,
+                      uiOutput("contenedor_graficos_merma")
+                    )
+                  )
+                  ),
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+          
+          
+          
+          
+          ###############
+          ##################
+          #############
           # 1. Pestaña de Reporte Administrativo (Antes tab_rendimiento)
           # 1. Pestaña de Reporte Administrativo
           tabItem(tabName = "tab_reporte_admin",
@@ -2628,7 +2906,7 @@ server <- function(input, output, session) {
     if (u$role == "JEFE_SECTOR" || u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
       
       # BLOQUEO ESTRICTO: Solo si la pestaña es 'tab_enfunde_ingreso'
-      if (actual == "tab_enfunde_ingreso"|| actual == "labores_reporte" || actual == "cajas_online" ) {
+      if (actual == "tab_enfunde_ingreso"|| actual == "labores_reporte" || actual == "cajas_online" || actual == "merma_online" ) {
         return(NULL)
       }
     }
@@ -4020,6 +4298,274 @@ server <- function(input, output, session) {
                       choices = c("Todas", empacadoras), 
                       selected = "Todas")
   })
+  
+  
+  
+  
+  
+  ######################
+  #####################
+  ######################
+  #ESTO DE LE MERMA 
+  
+  # -----------------------------------------------------------------
+  # 📉 MOTOR RECTIVO PARA EL PROCESAMIENTO DE MERMA
+  # -----------------------------------------------------------------
+  
+  # -----------------------------------------------------------------
+  # 📉 MOTOR REACTIVO SEGURO PARA EL PROCESAMIENTO DE MERMA
+  # -----------------------------------------------------------------
+  
+  # -----------------------------------------------------------------
+  # 📉 MOTOR BLINDADO E AISLADO PARA EL MÓDULO DE MERMA
+  # -----------------------------------------------------------------
+  
+  # -----------------------------------------------------------------
+  # 📉 MOTOR REACTIVO DE MERMA - LECTURA DIRECTA DE DRIVE
+  # -----------------------------------------------------------------
+  
+  # -----------------------------------------------------------------
+  # 📉 MOTOR COMPILADO Y HOMOLOGADO DE MERMA
+  # -----------------------------------------------------------------
+  # -----------------------------------------------------------------
+  # 📉 MOTOR DE MERMA - CORRECCIÓN DE COLUMNAS DE DRIVE
+  # -----------------------------------------------------------------
+  # -----------------------------------------------------------------
+  # 📉 MOTOR UNIFICADO Y SECUENCIAL PARA EL MÓDULO DE MERMA
+  # -----------------------------------------------------------------
+  # -----------------------------------------------------------------
+  # 📉 MOTOR DE DESPLIEGUE FINAL - GOOGLE SHEETS
+  # -----------------------------------------------------------------
+  # -----------------------------------------------------------------
+  # 📉 MOTOR DE DESPLIEGUE FINAL DE MERMA - SIN FILTRO DE FECHA ROTOR
+  # -----------------------------------------------------------------
+  # =================================================================
+  # 📉 NÚCLEO DE MONITOREO DE MERMA EN LÍNEA
+  # =================================================================
+  # =================================================================
+  # 📉 DETECTOR DE CLIC OBLIGATORIO PARA EL MÓDULO DE MERMA
+  # =================================================================
+  
+  # =================================================================
+  # 📉 MÓDULO DE MERMA DIRECTO A LA RAÍZ (SIN DEPENDER DEL MENÚ)
+  # =================================================================
+  
+  # =================================================================
+  # 📉 MÓDULO DE MERMA COMPLETO CON FILTRADO REACTIVO DE FECHAS Y SEMANAS
+  # =================================================================
+  
+  # 1. Carga inmediata de los datos desde Google Sheets al iniciar la app
+  data_merma_raw <- reactive({
+    df <- descargar_datos_merma()
+    return(df)
+  })
+  
+  # 2.A Llenado automático del selector de Semanas
+  observe({
+    df_m <- data_merma_raw()
+    req(!is.null(df_m) && nrow(df_m) > 0)
+    
+    semanas_lista <- sort(unique(as.character(df_m$Semana)), decreasing = TRUE)
+    semanas_lista <- semanas_lista[!is.na(semanas_lista) & semanas_lista != ""]
+    
+    semana_seleccionada <- if (!is.null(input$filtro_semana_merma)) input$filtro_semana_merma else "Todas"
+    
+    updateSelectInput(session, "filtro_semana_merma", 
+                      choices = c("Todas", semanas_lista), 
+                      selected = semana_seleccionada)
+  })
+  
+  # 2.B Llenado dinámico del selector de Haciendas (Fincas) afectado por Fecha y Semana
+  observe({
+    df_m <- data_merma_raw()
+    req(!is.null(df_m) && nrow(df_m) > 0)
+    
+    # Filtrar preventivamente por la semana o fecha seleccionada en la UI
+    if (!is.null(input$filtro_semana_merma) && input$filtro_semana_merma != "Todas") {
+      df_m <- df_m[df_m$Semana == input$filtro_semana_merma, ]
+    } else if (!is.null(input$filtro_fecha_merma)) {
+      df_m <- df_m[df_m$Fecha_Limpia == input$filtro_fecha_merma, ]
+    }
+    
+    fincas_lista <- sort(unique(as.character(df_m$`finca-nombre-dt`)))
+    fincas_lista <- fincas_lista[!is.na(fincas_lista) & fincas_lista != ""]
+    
+    finca_seleccionada <- if (!is.null(input$filtro_finca_merma)) input$filtro_finca_merma else "Todas"
+    
+    updateSelectInput(session, "filtro_finca_merma", 
+                      choices = c("Todas", fincas_lista), 
+                      selected = finca_seleccionada)
+  })
+  
+  # 3. Llenado dinámico del selector de Lotes dependiente de Finca, Semana y Fecha
+  observe({
+    df_m <- data_merma_raw()
+    req(!is.null(df_m) && nrow(df_m) > 0)
+    
+    # Filtrar por semana o fecha seleccionada primero
+    if (!is.null(input$filtro_semana_merma) && input$filtro_semana_merma != "Todas") {
+      df_m <- df_m[df_m$Semana == input$filtro_semana_merma, ]
+    } else if (!is.null(input$filtro_fecha_merma)) {
+      df_m <- df_m[df_m$Fecha_Limpia == input$filtro_fecha_merma, ]
+    }
+    
+    finca_seleccionada <- if (!is.null(input$filtro_finca_merma)) input$filtro_finca_merma else "Todas"
+    
+    df_sub <- df_m
+    if (finca_seleccionada != "Todas") {
+      df_sub <- df_sub[df_sub$`finca-nombre-dt` == finca_seleccionada, ]
+    }
+    
+    lotes_lista <- sort(unique(as.character(df_sub$`lote-nombre-dt`)))
+    lotes_lista <- lotes_lista[!is.na(lotes_lista) & lotes_lista != ""]
+    
+    lote_seleccionado <- if (!is.null(input$filtro_lote_merma)) input$filtro_lote_merma else "Todos"
+    
+    updateSelectInput(session, "filtro_lote_merma", 
+                      choices = c("Todos", lotes_lista), 
+                      selected = lote_seleccionado)
+  })
+  
+  # 4. Tabla de datos filtrada maestra (🔥 CORREGIDA: PRIORIZA LA SEMANA SI ESTÁ SELECCIONADA)
+  datos_merma_filtrados <- reactive({
+    df_f <- data_merma_raw()
+    if (is.null(df_f) || nrow(df_f) == 0) return(data.frame())
+    
+    # 📅 FILTRADO INTELIGENTE DE FECHA / SEMANA
+    if (!is.null(input$filtro_semana_merma) && input$filtro_semana_merma != "Todas") {
+      df_f <- df_f[df_f$Semana == input$filtro_semana_merma, ]
+    } else if (!is.null(input$filtro_fecha_merma)) {
+      df_f <- df_f[df_f$Fecha_Limpia == input$filtro_fecha_merma, ]
+    }
+    
+    # Filtrado por Finca
+    if (!is.null(input$filtro_finca_merma) && input$filtro_finca_merma != "Todas") {
+      df_f <- df_f[df_f$`finca-nombre-dt` == input$filtro_finca_merma, ]
+    }
+    
+    # Filtrado por Lote
+    if (!is.null(input$filtro_lote_merma) && input$filtro_lote_merma != "Todos") {
+      df_f <- df_f[df_f$`lote-nombre-dt` == input$filtro_lote_merma, ]
+    }
+    
+    return(df_f)
+  })
+  
+  # 5. Gráfico 1: Severidad por Lote 
+  output$grafico_merma_lotes <- renderHighchart({
+    df_res <- datos_merma_filtrados()
+    req(nrow(df_res) > 0)
+    
+    df_sev <- df_res %>%
+      filter(!is.na(`lote-nombre-dt`) & `lote-nombre-dt` != "") %>%
+      group_by(LOTE = `lote-nombre-dt`) %>%
+      summarise(
+        Bruta = round(mean(MermaBruta, na.rm = TRUE), 2),
+        Neta = round(mean(MermaNeta, na.rm = TRUE), 2), 
+        .groups = 'drop'
+      )
+    
+    highchart() %>%
+      hc_chart(type = "column") %>%
+      hc_title(text = "<b>Severidad de Descarte: Merma Bruta vs Neta (%) por Lote</b>") %>%
+      hc_xAxis(categories = df_sev$LOTE, title = list(text = "Lote")) %>%
+      hc_yAxis(title = list(text = "Porcentaje (%)")) %>%
+      hc_add_series(name = "Merma Bruta (%)", data = df_sev$Bruta, color = "#D9534F") %>%
+      hc_add_series(name = "Merma Neta (%)", data = df_sev$Neta, color = "#F0AD4E") %>%
+      hc_plotOptions(column = list(dataLabels = list(enabled = TRUE)))
+  })
+  
+  # 6. Gráfico 2: Top de Causas Críticas
+  output$grafico_merma_causas <- renderHighchart({
+    df_res <- datos_merma_filtrados()
+    req(nrow(df_res) > 0)
+    
+    df_cau <- df_res %>%
+      filter(!is.na(`Causa-nombre-dt`) & `Causa-nombre-dt` != "") %>%
+      group_by(Causa = `Causa-nombre-dt`) %>%
+      summarise(
+        Libras = round(sum(PesoCausas, na.rm = TRUE), 2),
+        Dedos = sum(CantidadDedos, na.rm = TRUE), 
+        .groups = 'drop'
+      ) %>%
+      arrange(desc(Libras))
+    
+    highchart() %>%
+      hc_chart(type = "bar") %>%
+      hc_title(text = "<b>Análisis de Causas Críticas: Peso Perdido y Dedos Afectados</b>") %>%
+      hc_xAxis(categories = df_cau$Causa) %>%
+      hc_add_series(name = "Libras de Merma", data = df_cau$Libras, color = "#337AB7") %>%
+      hc_add_series(name = "Conteo de Dedos", data = df_cau$Dedos, color = "#5CB85C") %>%
+      hc_plotOptions(bar = list(dataLabels = list(enabled = TRUE)))
+  })
+  
+  # 6.B Gráfico 3: Cantidad de Dedos y Total de Merma por Lote
+  output$grafico_dedos_merma_lote <- renderHighchart({
+    df_res <- datos_merma_filtrados()
+    req(nrow(df_res) > 0)
+    
+    df_dl <- df_res %>%
+      filter(!is.na(`lote-nombre-dt`) & `lote-nombre-dt` != "") %>%
+      group_by(LOTE = `lote-nombre-dt`) %>%
+      summarise(
+        Dedos = sum(CantidadDedos, na.rm = TRUE),
+        MermaTotal = round(sum(PesoCausas, na.rm = TRUE), 2),
+        .groups = 'drop'
+      ) %>%
+      arrange(desc(MermaTotal))
+    
+    highchart() %>%
+      hc_chart(type = "column") %>%
+      hc_title(text = "<b>Resumen Operativo: Cantidad de Dedos vs Total Peso Merma por Lote</b>") %>%
+      hc_xAxis(categories = df_dl$LOTE, title = list(text = "Lotes")) %>%
+      hc_yAxis(title = list(text = "Valores Acumulados")) %>%
+      hc_add_series(name = "Cantidad de Dedos (Unid)", data = df_dl$Dedos, color = "#26B99A") %>%
+      hc_add_series(name = "Total Merma (Lbs)", data = df_dl$MermaTotal, color = "#34495E") %>%
+      hc_plotOptions(column = list(dataLabels = list(enabled = TRUE)))
+  })
+  
+  # 7. Inyección forzada en la UI sin depender del menú lateral
+  output$contenedor_graficos_merma <- renderUI({
+   
+    df_f <- datos_merma_filtrados()
+    if (is.null(df_f) || nrow(df_f) == 0) {
+      return(h4("No hay datos disponibles para los filtros seleccionados.", style = "color: grey; text-align: center; padding: 40px;"))
+    }
+    
+    tagList(
+      # Fila 1: Los dos gráficos iniciales
+      fluidRow(
+        column(width = 6, highchartOutput("grafico_merma_lotes", height = "380px")),
+        column(width = 6, highchartOutput("grafico_merma_causas", height = "380px"))
+      ),
+      br(),
+      hr(), 
+      br(),
+      # Fila 2: Gráfico de Dedos y Merma por Lote (Ancho completo)
+      fluidRow(
+        column(width = 12, highchartOutput("grafico_dedos_merma_lote", height = "400px"))
+      )
+    )
+  })
+  ############
+  ##############
+  ###############
+  #
+  #############
+  
+  
+  # Acción para ejecutar la impresión desde el navegador
+  observeEvent(input$btn_imprimir_merma, {
+    shinyjs::runjs("window.print();")
+  
+  })
+  ###############
+  #
+  #############
+  #########
+  
+  
+  
   
   
 }
