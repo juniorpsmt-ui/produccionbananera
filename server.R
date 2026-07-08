@@ -1265,8 +1265,10 @@ server <- function(input, output, session) {
       
       
       dashboardBody(
+       
+        ###### ESTO PUSE POR SI ACASSO PARA QUE FUNCIONE EL SISTEMA O SI NO BORRARLO NO HAY PROBELMA
         
-        
+        shinyjs::useShinyjs(),
       
         # Este código genera un estilo CSS que bloquea los clics solo para el Observador
         uiOutput("style_bloqueo"),
