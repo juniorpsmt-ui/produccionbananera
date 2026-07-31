@@ -3896,10 +3896,19 @@ server <- function(input, output, session) {
         p_max_ok + rango_tolerancia,
         p_max_ok + (rango_tolerancia * 2)
       )
+      ####################################
+      cortes_completos <- c(cortes, Inf)
+      ####################################
+      
+      
       
       # Asignamos las etiquetas legibles
       etiquetas <- sprintf("[%.2f - %.2f]", cortes[-length(cortes)], cortes[-1])
-      df_marca$Rango <- cut(df_marca$Pesoneto, breaks = cortes, labels = etiquetas, include.lowest = TRUE)
+      
+     ##"######### # 3. Añadimos la etiqueta especial para todo peso que sobrepase el máximo
+      etiquetas <- c(etiquetas, sprintf("[> %.2f]", cortes[length(cortes)]))
+      
+      df_marca$Rango <- cut(df_marca$Pesoneto, breaks = cortes_completos, labels = etiquetas, include.lowest = TRUE)
       
       # ---- AGRUPACIÓN Y CONTEO ----
       df_resumen <- df_marca %>%
