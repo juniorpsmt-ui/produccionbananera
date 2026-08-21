@@ -719,6 +719,11 @@ server <- function(input, output, session) {
         SEMANA_COSECHA = as.character(SEMANA_COSECHA),
         # *** NUEVO: Aseguramos que 'Has' sea numérico para usarlo en cálculos ***
         Has = as.numeric(Has),
+        `Numero de manos` = as.numeric(`Numero de manos`),
+        CALIBRACION_SUP = as.numeric(CALIBRACION_SUP),
+        
+        Edad = as.numeric(Edad),
+       
         # Aseguramos que 'Rechazado' sea un factor o carácter limpio (ej. mayúsculas)
         Rechazado = as.character(Rechazado)
         
@@ -1002,6 +1007,7 @@ server <- function(input, output, session) {
         Peso_Bruto_Promedio = mean(PESO_BRUTO, na.rm = TRUE), 
         Calibracion_Promedio = mean(CALIBRACION_SUP, na.rm = TRUE),
         Num_Manos_Promedio = mean(`Numero de manos`, na.rm = TRUE),
+ 
         # *** NUEVO CÁLCULO: Promedio de Edad ***
         Edad_Promedio = mean(Edad, na.rm = TRUE),
         
