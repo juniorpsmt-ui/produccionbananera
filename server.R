@@ -15,6 +15,7 @@ library(lubridate)
 library(httr)
 library(highcharter)
 library(htmltools)
+library(jsonlite)
 
 library(googledrive)
 library(googlesheets4)
@@ -268,39 +269,64 @@ descargar_datos_merma <- function() {
 
 #####################
 ##################ESTO CREO QUE DE CJAS 
+
+# descargar_datos <- function() {
+#   file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
+#   
+#   tryCatch({
+#     # 🔓 Acceso público sin credenciales JSON
+#     googlesheets4::gs4_deauth()
+#     
+#     # 🚀 Lectura por API pública
+#     df <- googlesheets4::read_sheet(
+#       ss = file_id, 
+#       sheet = "Datos",
+#       col_types = "c"
+#     )
+#     
+#     df <- as.data.frame(df)
+#     gc() # Liberar memoria RAM
+#     
+#     return(df)
+#     
+#   }, error = function(e) {
+#     cat("\n⚠️ Error crítico en la descarga por API:", e$message, "\n")
+#     return(NULL)
+#   })
+# }
 #####################
-######################
+######################ESTE SI FUNCIONA OJOJOJOOJOJOOJOJOJOJOJOJOJJOOJJO
 
 descargar_datos <- function() {
   file_id <- "1tkEpiLxt4sxyK9IdQzVKBX6lmi7ESiwj"
   tf <- tempfile(fileext = ".xlsx")
-  
+
   tryCatch({
     # Al ser un archivo con acceso público por enlace, la API de exportación de Google
     # te entrega el archivo .xlsx limpio de forma directa mediante HTTP estándar.
     url_publica <- paste0("https://docs.google.com/spreadsheets/d/", file_id, "/export?format=xlsx")
-    
+
     # Descarga binaria nativa del sistema operativo, ultra-veloz e infalible
     utils::download.file(url_publica, destfile = tf, mode = "wb", quiet = TRUE)
-    
+
     # 3. Leer el archivo Excel resultante si la descarga fue exitosa
     if (file.exists(tf) && file.info(tf)$size > 1000) {
       df <- readxl::read_excel(tf, sheet = "Datos", guess_max = 5000)
       df <- as.data.frame(df)
-      
+
       gc() # Forzar la liberación inmediata de memoria RAM de Posit
       return(df)
     } else {
       cat("\n⚠️ Error: El archivo no se pudo descargar. Verifica que esté compartido por enlace.\n")
       return(NULL)
     }
-    
+
   }, error = function(e) {
     cat("\n⚠️ Error crítico en la descarga directa:", e$message, "\n")
     return(NULL)
   })
 }
-##################
+# ##################
 ###########
 
 # --- CARGA DE DATOS MAESTROS ---
@@ -1236,6 +1262,12 @@ server <- function(input, output, session) {
           
           # *** PESTAÑA 1 RENOMBRADA Y TABNAME CORREGIDO ***
           
+          menuItem("Ingreso de Información", 
+            tabName = "ingreso_nuevo_modulo", 
+            icon = icon("file-invoice")
+          ),
+        
+          
           menuItem("Cajas Procesadas en Línea", tabName = "cajas_online", icon = icon("box")),
           
           
@@ -1420,6 +1452,108 @@ server <- function(input, output, session) {
         
         
         tabItems(
+          
+          
+          ###################
+          #############
+          
+          
+          tabItem(
+            tabName = "ingreso_nuevo_modulo",
+            fluidRow(
+              # --- FORMULARIO DE INGRESO DE DATOS ---
+              box(
+                title = "📝 Formulario: Ingreso de Peso por Mano", 
+                status = "primary", 
+                solidHeader = TRUE, 
+                width = 4,
+                semana_actual <- as.integer(format(Sys.Date(), "%V")),
+                # textInput("in_cantidad", "Cantidad de Registros/Manos:", value = 1, min = 1),
+                # numericInput("in_semana", "Semana de Cosecha:", value = 39, min = 1, max = 52),
+                
+                numericInput(
+                  inputId = "in_semana", 
+                  label   = "Semana de Cosecha:", 
+                  value   = semana_actual, 
+                  min     = 1, 
+                  max     = 53, 
+                  step    = 1
+                ),
+                dateInput("in_fecha", "Fecha de Registro:", value = Sys.Date(), language = "es"),
+                textInput("in_finca", "Finca / Hacienda:", value = "SAN HUMBERTO"),
+               
+                numericInput(
+                  inputId = "in_lote", 
+                  label   = "Lote (# 1 al 35):", 
+                  value   = 1, 
+                  min     = 1, 
+                  max     = 35, 
+                  step    = 1
+                ),
+                # textInput("in_lote", "Lote:", value = "Lote 1"),
+                
+                # Selecciona la ubicación/posición exacta de la mano
+                numericInput(
+                  inputId = "in_manos", 
+                  label   = "Ubicación / Posición de la Mano (#):", 
+                  value   = 1,   # Puedes cambiar el valor por defecto o dejarlo en blanco con NA si prefieres
+                  min     = 1, 
+                  max     = 20, 
+                  step    = 1
+                ),
+                
+                # Peso individual correspondiente a esa mano
+                numericInput("in_peso", "Peso Individual de esta Mano (Lb / Kg):", value = 8.5, min = 0.1, step = 0.1),
+                
+                hr(),
+                actionButton("btn_guardar", "💾 Guardar Registro", class = "btn-success btn-block")
+              ),
+              
+              # --- DASHBOARD & VISUALIZACIONES REACTIVAS ---
+              box(
+                title = "📊 Dashboard de Análisis de Manos Registradas", 
+                status = "info", 
+                solidHeader = TRUE, 
+                width = 8,
+                
+                # Tarjetas KPI principales
+                fluidRow(
+                  valueBoxOutput("vbox_total_cantidad", width = 4),
+                  valueBoxOutput("vbox_total_peso", width = 4),
+                  valueBoxOutput("vbox_prom_manos", width = 4)
+                ),
+                
+                # Gráficos interactivos
+                fluidRow(
+                  box(
+                    title = "Evolución por Semana (Peso Acumulado)", 
+                    width = 6, 
+                    status = "warning", 
+                    plotly::plotlyOutput("plot_peso_semana")
+                  ),
+                  box(
+                    title = "Peso Promedio según Ubicación de la Mano", 
+                    width = 6, 
+                    status = "warning", 
+                    plotly::plotlyOutput("plot_peso_posicion")
+                  )
+                ),
+                
+                hr(),
+                # Tabla de registros persistidos
+                h4("📋 Histórico de Manos Ingresadas"),
+                DT::dataTableOutput("tabla_registros_guardados")
+              )
+            )
+          ),
+          
+          #######################
+          
+          ################
+          #################
+          ####################
+          
+          
           
           tabItem(tabName = "cajas_online",
                   
@@ -2914,7 +3048,7 @@ server <- function(input, output, session) {
     if (u$role == "JEFE_SECTOR" || u$role == "SUPER_ADMIN" || u$role == "ADMIN_EMPRESA") {
       
       # BLOQUEO ESTRICTO: Solo si la pestaña es 'tab_enfunde_ingreso'
-      if (actual == "tab_enfunde_ingreso"|| actual == "labores_reporte" || actual == "cajas_online" || actual == "merma_online" ) {
+      if (actual == "tab_enfunde_ingreso"|| actual == "labores_reporte" || actual == "cajas_online" || actual == "merma_online" || actual == "ingreso_nuevo_modulo" ) {
         return(NULL)
       }
     }
@@ -4581,6 +4715,489 @@ server <- function(input, output, session) {
   #############
   #########
   
+  
+  
+  ##############
+  ###############
+  ##############
+  ###########
+  
+  
+  # ==============================================================================
+  # CONFIGURACIÓN Y PERSISTENCIA DE DATOS
+  # ==============================================================================
+  
+  # ==============================================================================
+  # CONFIGURACIÓN Y CONEXIÓN CON GOOGLE DRIVE / SHEETS
+  # ==============================================================================
+  # 1. Configurar opciones globales para FORZAR modo no interactivo
+  # ID de la hoja de Google Sheets y ruta de las credenciales JSON
+  
+  # 1. Le decimos a Shiny que use la cuenta que acabas de loguear en la consola sin volver a preguntar
+  # 1. Configuración para evitar el prompt de login en Posit Cloud
+  # Asegurar autenticación no interactiva de googlesheets4 si usas Service Account / Token
+ 
+  
+  
+  
+  FILE_ID_DRIVE <- "1W28BJvWizMksa6wvE-nHbCZ_r-CfolwxThorDM0RxTM"
+  
+  # Reactivo contenedor
+  datos_drive_reactive <- reactiveVal(NULL)
+  
+  # cargar_datos_drive <- function() {
+  #   tryCatch({
+  #     # 1. Modo público (sin tokens ni archivos JSON)
+  #     googlesheets4::gs4_deauth()
+  #     
+  #     # 2. Leer la Google Sheet directamente
+  #     df_raw <- googlesheets4::read_sheet(
+  #       ss = FILE_ID_DRIVE, 
+  #       sheet = 1,
+  #       col_types = "c",
+  #       trim_ws = TRUE
+  #     )
+  #     
+  #     if (is.null(df_raw) || nrow(df_raw) == 0) {
+  #       cat("ℹ️ La hoja no tiene filas con datos registrados.\n")
+  #       datos_drive_reactive(data.frame())
+  #       return()
+  #     }
+  #     
+  #     # Limpiar nombres de columnas
+  #     names(df_raw) <- trimws(tolower(names(df_raw)))
+  #     
+  #     # Función de limpieza de números (remueve texto y convierte comas a puntos)
+  #     clean_num <- function(x) {
+  #       if (is.null(x)) return(0)
+  #       v <- as.character(x)
+  #       v <- gsub(",", ".", v, fixed = TRUE)
+  #       v <- gsub("[^0-9.-]", "", v)
+  #       val <- suppressWarnings(as.numeric(v))
+  #       val[is.na(val) | is.nan(val) | is.infinite(val)] <- 0
+  #       return(val)
+  #     }
+  #     
+  #     # Función de limpieza de fechas
+  #     clean_fecha <- function(x) {
+  #       if (is.null(x)) return(Sys.Date())
+  #       v <- as.character(x)
+  #       f <- suppressWarnings(as.Date(v, format = "%d/%m/%Y"))
+  #       if (all(is.na(f))) {
+  #         f <- suppressWarnings(as.Date(v))
+  #       }
+  #       f[is.na(f)] <- Sys.Date()
+  #       return(f)
+  #     }
+  #     
+  #     # Transformación de datos
+  #     df_clean <- df_raw %>%
+  #       rename_with(~ "manos", matches("manos|#")) %>%
+  #       mutate(
+  #         cantidad = clean_num(cantidad),
+  #         semana   = clean_num(semana),
+  #         manos    = clean_num(manos),
+  #         peso     = clean_num(peso),
+  #         fecha    = clean_fecha(fecha),
+  #         finca    = ifelse(is.na(finca) | trimws(finca) == "", "Sin Finca", as.character(finca)),
+  #         lote     = ifelse(is.na(lote) | trimws(lote) == "", "Sin Lote", as.character(lote))
+  #       ) %>%
+  #       filter(cantidad > 0 | peso > 0)
+  #     
+  #     datos_drive_reactive(df_clean)
+  #     cat("✅ Carga finalizada con éxito. Registros válidos:", nrow(df_clean), "\n")
+  #     
+  #   }, error = function(e) {
+  #     cat("❌ Error en lectura:", e$message, "\n")
+  #     showNotification(paste("Error al cargar datos:", e$message), type = "error")
+  #   })
+  # }
+  
+  cargar_datos_drive <- function() {
+    tryCatch({
+      googlesheets4::gs4_deauth()
+      
+      df_raw <- googlesheets4::read_sheet(
+        ss = FILE_ID_DRIVE, 
+        sheet = 1,
+        col_types = "c",
+        trim_ws = TRUE
+      )
+      
+      if (is.null(df_raw) || nrow(df_raw) == 0) {
+        cat("ℹ️ La hoja no tiene filas con datos registrados.\n")
+        datos_drive_reactive(data.frame())
+        return()
+      }
+      
+      names(df_raw) <- trimws(tolower(names(df_raw)))
+      
+      clean_num <- function(x) {
+        if (is.null(x)) return(0)
+        v <- as.character(x)
+        v <- gsub(",", ".", v, fixed = TRUE)
+        v <- gsub("[^0-9.-]", "", v)
+        val <- suppressWarnings(as.numeric(v))
+        val[is.na(val) | is.nan(val) | is.infinite(val)] <- 0
+        return(val)
+      }
+      
+      clean_fecha <- function(x) {
+        if (is.null(x)) return(Sys.Date())
+        v <- as.character(x)
+        f <- suppressWarnings(as.Date(v, format = "%d/%m/%Y"))
+        if (all(is.na(f))) {
+          f <- suppressWarnings(as.Date(v))
+        }
+        f[is.na(f)] <- Sys.Date()
+        return(f)
+      }
+      
+      # Transformación sin la columna 'cantidad'
+      df_clean <- df_raw %>%
+        rename_with(~ "manos", matches("manos|#")) %>%
+        mutate(
+          semana   = if("semana" %in% names(.)) clean_num(semana) else 0,
+          manos    = if("manos" %in% names(.))  clean_num(manos) else 0,
+          peso     = if("peso" %in% names(.))   clean_num(peso) else 0,
+          fecha    = if("fecha" %in% names(.))  clean_fecha(fecha) else Sys.Date(),
+          finca    = if("finca" %in% names(.))  ifelse(is.na(finca) | trimws(finca) == "", "Sin Finca", as.character(finca)) else "Sin Finca",
+          lote     = if("lote" %in% names(.))   ifelse(is.na(lote) | trimws(lote) == "", "Sin Lote", as.character(lote)) else "Sin Lote"
+        ) %>%
+        filter(peso > 0)
+      
+      # Agregar numeración de registro consecutiva para el dashboard
+      if (nrow(df_clean) > 0) {
+        df_clean$num_registro <- seq_len(nrow(df_clean))
+      }
+      
+      datos_drive_reactive(df_clean)
+      cat("✅ Carga finalizada con éxito. Registros válidos:", nrow(df_clean), "\n")
+      
+    }, error = function(e) {
+      cat("❌ Error en lectura:", e$message, "\n")
+      showNotification(paste("Error al cargar datos:", e$message), type = "error")
+    })
+  }
+  
+  # Cargar inmediatamente
+  cargar_datos_drive()
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  # ==============================================================================
+  # COMPONENTES DEL DASHBOARD (KPIS Y GRÁFICOS)
+  # ==============================================================================
+  
+  # 1. KPI: Total de Manos / Registros Realizados
+  
+  
+  output$vbox_total_cantidad <- renderValueBox({
+    df <- datos_drive_reactive()
+    val <- if (!is.null(df) && nrow(df) > 0) nrow(df) else 0
+    valueBox(format(val, big.mark = ","), "Manos Registradas", icon = icon("hand-paper"), color = "blue")
+  })
+  # 2. KPI: Peso Acumulado
+  output$vbox_total_peso <- renderValueBox({
+    df <- datos_drive_reactive()
+    val <- if (!is.null(df) && nrow(df) > 0) round(sum(df$peso, na.rm = TRUE), 2) else 0
+    valueBox(format(val, big.mark = ","), "Peso Acumulado (Lb/Kg)", icon = icon("weight-hanging"), color = "green")
+  })
+  
+  # 3. KPI: Peso Promedio
+  output$vbox_prom_manos <- renderValueBox({
+    df <- datos_drive_reactive()
+    val <- if (!is.null(df) && nrow(df) > 0) round(mean(df$peso, na.rm = TRUE), 2) else 0
+    valueBox(val, "Peso Promedio por Mano", icon = icon("balance-scale"), color = "purple")
+  })
+  
+  # 4. Gráfico 1: Evolución por Semana
+  output$plot_peso_semana <- plotly::renderPlotly({
+    df <- datos_drive_reactive()
+    req(!is.null(df), nrow(df) > 0)
+    
+    resumen_semana <- df %>%
+      group_by(semana) %>%
+      summarise(peso_total = sum(peso, na.rm = TRUE), .groups = 'drop')
+    
+    plot_ly(
+      resumen_semana, 
+      x = ~semana, 
+      y = ~peso_total, 
+      type = 'scatter', 
+      mode = 'lines+markers',
+      line = list(color = '#00a65a', width = 3)
+    ) %>%
+      layout(
+        xaxis = list(title = "Semana de Cosecha"), 
+        yaxis = list(title = "Peso Acumulado")
+      )
+  })
+  
+  # 5. Gráfico 2: Peso Promedio por Posición (Uso de 'manos' en lugar de '# manos')
+  output$plot_peso_posicion <- plotly::renderPlotly({
+    df <- datos_drive_reactive()
+    req(!is.null(df), nrow(df) > 0)
+    
+    resumen_posicion <- df %>%
+      group_by(finca, manos) %>%
+      summarise(peso_promedio = mean(peso, na.rm = TRUE), .groups = 'drop') %>%
+      arrange(manos)
+    
+    plot_ly(
+      resumen_posicion, 
+      x = ~as.factor(manos), 
+      y = ~peso_promedio, 
+      color = ~finca, 
+      type = 'bar'
+    ) %>%
+      layout(
+        barmode = 'group',
+        xaxis = list(title = "Posición de la Mano (1ª, 2ª, 3ª...)"), 
+        yaxis = list(title = "Peso Promedio Individual")
+      )
+  })
+  
+  # 6. Tabla DT con los registros
+  output$tabla_registros_guardados <- DT::renderDataTable({
+    df <- datos_drive_reactive()
+    req(!is.null(df))
+    DT::datatable(df, options = list(pageLength = 5, scrollX = TRUE), selection = "none")
+  })
+  ##############
+  ################
+  ###############
+  
+  
+  
+  
+  # observeEvent(input$btn_guardar, {
+  #   
+  #   # 1. Validaciones básicas antes de enviar
+  #   if (is.null(input$in_peso) || is.na(input$in_peso) || input$in_peso <= 0) {
+  #     showNotification("⚠️ Por favor ingrese un peso válido mayor a 0.", type = "warning")
+  #     return()
+  #   }
+  #   
+  #   if (is.null(input$in_cantidad) || is.na(input$in_cantidad) || input$in_cantidad <= 0) {
+  #     showNotification("⚠️ Por favor ingrese una cantidad válida.", type = "warning")
+  #     return()
+  #   }
+  #   
+  #   # Mostrar notificación de procesamiento
+  #   id_notif <- showNotification("💾 Guardando registro en Google Sheets...", type = "message", duration = NULL)
+  #   
+  #   tryCatch({
+  #     # 2. Desactivar autenticación (aprovechando acceso público con edición)
+  #     googlesheets4::gs4_deauth()
+  #     
+  #     # 3. Formatear la fecha a texto YYYY-MM-DD
+  #     fecha_txt <- format(as.Date(input$in_fecha), "%Y-%m-%d")
+  #     
+  #     # 4. Crear el data frame con la fila a insertar (mismo orden de columnas que la hoja)
+  #     nueva_fila <- data.frame(
+  #       cantidad = as.character(input$in_cantidad),
+  #       semana   = as.character(input$in_semana),
+  #       fecha    = as.character(fecha_txt),
+  #       finca    = as.character(trimws(input$in_finca)),
+  #       lote     = as.character(trimws(input$in_lote)),
+  #       manos    = as.character(input$in_posicion), # Columna '# manos'
+  #       peso     = as.character(input$in_peso),
+  #       stringsAsFactors = FALSE
+  #     )
+  #     
+  #     # 5. Insertar la nueva fila al final de la hoja de Google Sheets
+  #     googlesheets4::sheet_append(
+  #       ss = FILE_ID_DRIVE,
+  #       data = nueva_fila,
+  #       sheet = 1
+  #     )
+  #     
+  #     removeNotification(id_notif)
+  #     showNotification("✅ ¡Registro guardado exitosamente!", type = "message", duration = 4)
+  #     
+  #     # 6. Recargar los datos para actualizar los KPIs, gráficos y la tabla al instante
+  #     cargar_datos_drive()
+  #     
+  #   }, error = function(e) {
+  #     removeNotification(id_notif)
+  #     cat("❌ Error al guardar en Google Sheets:", e$message, "\n")
+  #     showNotification(paste("Error al guardar:", e$message), type = "error", duration = 8)
+  #   })
+  # })
+  # 
+  # 
+  # Reemplaza esta URL con la que te dio Apps Script en el Paso 1
+  
+  
+  
+  URL_WEB_APP <- "https://script.google.com/macros/s/AKfycbwgCV_WDAFSPIqry9B426tJvX2YgNsJBfRSu_Fz1jGIUE8wjCvxbP3T1F1yV9ilEe1e/exec"
+  
+  # observeEvent(input$btn_guardar, {
+  #   
+  #   req(input$in_cantidad, input$in_semana, input$in_fecha, input$in_manos, input$in_peso)
+  #   
+  #   if (as.numeric(input$in_peso) <= 0) {
+  #     showNotification("⚠️ Por favor ingrese un peso válido mayor a 0.", type = "warning")
+  #     return()
+  #   }
+  #   
+  #   id_notif <- showNotification("💾 Guardando registro...", type = "message", duration = NULL)
+  #   
+  #   tryCatch({
+  #     # 1. Preparar cuerpo del mensaje en formato JSON
+  #     datos_envio <- list(
+  #       cantidad = as.character(input$in_cantidad),
+  #       semana   = as.character(input$in_semana),
+  #       fecha    = format(as.Date(input$in_fecha), "%Y-%m-%d"),
+  #       finca    = if (is.null(input$in_finca) || trimws(input$in_finca) == "") "SAN HUMBERTO" else trimws(input$in_finca),
+  #       lote     = if (is.null(input$in_lote)  || trimws(input$in_lote) == "")  "Lote 1"       else trimws(input$in_lote),
+  #       manos    = as.character(input$in_manos),
+  #       peso     = as.character(input$in_peso)
+  #     )
+  #     
+  #     # 2. Enviar petición HTTP POST a Google Apps Script
+  #     res <- httr::POST(
+  #       url = URL_WEB_APP,
+  #       body = jsonlite::toJSON(datos_envio, auto_unbox = TRUE),
+  #       encode = "json",
+  #       httr::content_type_json()
+  #     )
+  #     
+  #     removeNotification(id_notif)
+  #     
+  #     if (httr::status_code(res) == 200) {
+  #       showNotification("✅ ¡Registro guardado exitosamente!", type = "message", duration = 4)
+  #       # Recargar tabla y KPIs
+  #       cargar_datos_drive()
+  #     } else {
+  #       showNotification("❌ Ocurrió un problema al enviar la información.", type = "error")
+  #     }
+  #     
+  #   }, error = function(e) {
+  #     removeNotification(id_notif)
+  #     cat("❌ Error al guardar:", e$message, "\n")
+  #     showNotification(paste("Error al guardar:", e$message), type = "error", duration = 8)
+  #   })
+  # })
+  # 
+  
+  
+  # 1. Al enviar los datos mediante HTTP POST (sin enviar cantidad)
+  observeEvent(input$btn_guardar, {
+    
+    req(input$in_semana, input$in_fecha, input$in_manos, input$in_peso)
+    
+    if (as.numeric(input$in_peso) <= 0) {
+      showNotification("⚠️ Por favor ingrese un peso válido mayor a 0.", type = "warning")
+      return()
+    }
+    
+    id_notif <- showNotification("💾 Guardando registro...", type = "message", duration = NULL)
+    
+    tryCatch({
+      datos_envio <- list(
+        semana = as.character(input$in_semana),
+        fecha  = format(as.Date(input$in_fecha), "%Y-%m-%d"),
+        finca  = if (is.null(input$in_finca) || trimws(input$in_finca) == "") "SAN HUMBERTO" else trimws(input$in_finca),
+        
+        # En la estructura de datos_envio dentro de btn_guardar:
+        lote = as.character(input$in_lote),
+        #lote   = if (is.null(input$in_lote)  || trimws(input$in_lote) == "")  "Lote 1"       else trimws(input$in_lote),
+        manos  = as.character(input$in_manos),
+        peso   = as.character(input$in_peso)
+      )
+      
+      res <- httr::POST(
+        url = URL_WEB_APP,
+        body = jsonlite::toJSON(datos_envio, auto_unbox = TRUE),
+        encode = "json",
+        httr::content_type_json()
+      )
+      
+      removeNotification(id_notif)
+      
+      contenido <- httr::content(res, as = "text", encoding = "UTF-8")
+      
+      if (httr::status_code(res) == 200 && grepl("success", contenido)) {
+        showNotification("✅ ¡Registro guardado exitosamente!", type = "message", duration = 4)
+        cargar_datos_drive()
+      } else {
+        showNotification(paste("❌ Error:", contenido), type = "error", duration = 8)
+      }
+      
+    }, error = function(e) {
+      removeNotification(id_notif)
+      showNotification(paste("Error al guardar:", e$message), type = "error", duration = 8)
+    })
+  })
+  
+  # 2. Al leer los datos cargados de Drive, genera la columna "Mano N°" consecutiva
+  datos_procesados <- reactive({
+    df <- datos_raw() # Datos traídos desde Google Drive/Sheets
+    
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    
+    # Convertir peso a numérico
+    df$peso <- as.numeric(df$peso)
+    df$semana <- as.numeric(df$semana)
+    
+    # Crear la columna de conteo consecutivo (1, 2, 3...)
+    df$num_mano <- paste0("Mano ", seq_len(nrow(df)))
+    
+    return(df)
+  })
+  
+  # 3. Renderizar la tabla histórica con la nueva columna informativa
+  output$tabla_historico <- renderDT({
+    df <- datos_procesados()
+    req(df)
+    
+    # Seleccionamos y reordenamos las columnas a mostrar
+    df_mostrar <- df [, c("num_mano", "semana", "fecha", "finca", "lote", "manos", "peso")]
+    colnames(df_mostrar) <- c("Registro N°", "Semana", "Fecha", "Finca", "Lote", "Posición Mano", "Peso (Lb/Kg)")
+    
+    datatable(df_mostrar, options = list(pageLength = 5, scrollX = TRUE))
+  })
+  
+  ###############
+  ##################
+  ################
+  
+  
+  # Si usas un reactiveVal para controlar la pestaña activa:
+  pestaña_activa <- reactiveVal("ingreso_nuevo_modulo") # O la pestaña por defecto que abra tu app
+  
+  observeEvent(input$tabsid, {
+    req(input$tabsid)
+    pestaña_activa(input$tabsid)
+  })
+  
+  ############################calcala semana segun la fecha
+  
+  # Actualiza el campo de la semana automáticamente cuando cambia la fecha de registro
+  observeEvent(input$in_fecha, {
+    req(input$in_fecha)
+    
+    fecha_sel <- as.Date(input$in_fecha)
+    # "%V" calcula la semana ISO 8601 (lunes-domingo) correcta
+    semana_calc <- as.integer(format(fecha_sel, "%V"))
+    
+    updateNumericInput(
+      session = session, 
+      inputId = "in_semana", 
+      value   = semana_calc
+    )
+  })
   
   
   
